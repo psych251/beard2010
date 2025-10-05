@@ -1,5 +1,5 @@
-# Replication Project Template
+# Eric Martz's Psych 251 Replication Project
 
-This is a GitHub template to use for replications projects in PSYCH 251. Create a new repo using this as a template in order to use it.
+This is Eric Martz's repo for a replication of the Beard & Amir paper, "Interpretation in Social Anxiety: When Meaning Precedes Ambiguity" for Psych 251: Experimental Methods Autumn 2025.
 
-The template contains the replication project template as well as a file called `anonymize.py` that you can run to remove personally-identifiable information from the data exported by Qualtrics. Just run `python anonymize.py` to anonymize all Qualtrics `csv` files in the `data` directory.
+This repository contains a writeup, data, and the original paper being replicated.
