@@ -1,6 +1,6 @@
 ---
-title: "Replication of Study X by Sample & Sample (20xx, Psychological Science)"
-author: "Replication Author[s] (contact information)"
+title: "Replication of Beard & Amir (2010, Cognitive Therapy and Research)"
+author: "Eric Martz (emartz@stanfordl.edu)"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 format:
   html:
@@ -12,8 +12,19 @@ format:
 
 ## Introduction
 
-[No abstract is needed.]  Each replication project will have a straightforward, no frills report of the study and results.  These reports will be publicly available as supplementary material for the aggregate report(s) of the project as a whole.  Also, to maximize project integrity, the intro and methods will be written and critiqued in advance of data collection.  Introductions can be just 1-2 paragraphs clarifying the main idea of the original study, the target finding for replication, and any other essential information.  It will NOT have a literature review -- that is in the original publication. You can write both the introduction and the methods in past tense.  
+I chose this study because I am relatively new to psychology research as I pivot from my MS in Computer Science toward preparing for grad school in clinical psychology. As a result, I wanted to replicate an experiment related to clinical psychology, which posed some challenges as there are relatively few studies that are single session and can be administered entirely online. "Interpretation in Social Anxiety: When Meaning Precedes Ambiguity" by Beard & Amir is one of few studies that meet these requirements while also aligning with my research interests in anxiety and depression. The paper explores how interpretation biases change depending on the level of self-reported anxiety individuals have. 
 
+The study procedure will begin by asking participants to complete three self-report measures: Social Phobia and Anxiety Inventory (SPAI; Turner et al. 1989), the State Trait Anxiety Inventory (STAI; Spielberger et al. 1970) and the Beck Depression Inventory (BDI; Beck and Steer 1987). They will then complete the Word Sentence Association Paradigm, which asks participants to stare at a fixation cross for 500 ms, read a priming word that is either benign or threat-related for 500 ms, read an ambiguous sentence, then upon finishing reading choose whether the priming word applied to the sentence or not. The reaction times, percentage of benign responses, and percentage of threat responses were measured.
+
+One potential challenge of replication will be that the author only shared five example sentences and prime words, but I intend to reach out to the author to request the full set of word-sentence pairs. Another will be coding the interface used to administer the experiment, since I have never built an experiment before (although I hope my other coding experience will help).
+
+You can find the original paper here: https://pmc.ncbi.nlm.nih.gov/articles/PMC2792932/
+
+You can find my GitHub repository here: https://github.com/psych251/beard2010
+
+--- Kept for Reference ---
+[No abstract is needed.]  Each replication project will have a straightforward, no frills report of the study and results.  These reports will be publicly available as supplementary material for the aggregate report(s) of the project as a whole.  Also, to maximize project integrity, the intro and methods will be written and critiqued in advance of data collection.  Introductions can be just 1-2 paragraphs clarifying the main idea of the original study, the target finding for replication, and any other essential information.  It will NOT have a literature review -- that is in the original publication. You can write both the introduction and the methods in past tense.  
+--- 
 
 ## Methods
 
