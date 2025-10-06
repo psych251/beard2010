@@ -1,6 +1,6 @@
 ---
 title: "Replication of Beard & Amir (2010, Cognitive Therapy and Research)"
-author: "Eric Martz (emartz@stanfordl.edu)"
+author: "Eric Martz (emartz@stanford.edu)"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 format:
   html:
