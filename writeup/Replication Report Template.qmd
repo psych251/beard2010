@@ -12,6 +12,8 @@ format:
 
 ## Introduction
 
+
+**Project Proposal**
 I chose this study because I am relatively new to psychology research as I pivot from my MS in Computer Science toward preparing for grad school in clinical psychology. As a result, I wanted to replicate an experiment related to clinical psychology, which posed some challenges as there are relatively few studies that are single session and can be administered entirely online. "Interpretation in Social Anxiety: When Meaning Precedes Ambiguity" by Beard & Amir is one of few studies that meet these requirements while also aligning with my research interests in anxiety and depression. The paper explores how interpretation biases change depending on the level of self-reported anxiety individuals have. 
 
 The study procedure will begin by asking participants to complete three self-report measures: Social Phobia and Anxiety Inventory (SPAI; Turner et al. 1989), the State Trait Anxiety Inventory (STAI; Spielberger et al. 1970) and the Beck Depression Inventory (BDI; Beck and Steer 1987). They will then complete the Word Sentence Association Paradigm, which asks participants to stare at a fixation cross for 500 ms, read a priming word that is either benign or threat-related for 500 ms, read an ambiguous sentence, then upon finishing reading choose whether the priming word applied to the sentence or not. The reaction times, percentage of benign responses, and percentage of threat responses were measured.
