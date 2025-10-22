@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Word Sentence Association Paradigm</title>
+    <script src="https://unpkg.com/jspsych@8.2.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+    <script src="https://unpkg.com/papaparse@5.3.0/papaparse.min.js"></script>
+    <link
+      href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <style>
+      body {
+        background-color: #d3d3d3;
+      }
+      .jspsych-content {
+        background-color: #d3d3d3;
+      }
+    </style>
+  </head>
+  <body></body>
+  <script>
+    // Initialize jsPsych
+    var jsPsych = initJsPsych({
+      on_finish: function () {
+        var wsap_data = jsPsych.data.get().filter({ task: "wsap" });
+        document.body.innerHTML =
+          '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">Saving your data...</div>';
+
+        // Send to server
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "write_data.php");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.onload = function () {
+          if (xhr.status == 200) {
+            document.body.innerHTML =
+              '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">Thank you! Your data has been saved.<br><br>You may now close this window.</div>';
+          } else {
+            document.body.innerHTML =
+              '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">There was an error saving your data.<br><br>Please contact the researcher.</div>';
+          }
+        };
+        xhr.onerror = function () {
+          document.body.innerHTML =
+            '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">There was an error saving your data.<br><br>Please contact the researcher.</div>';
+        };
+        xhr.send(JSON.stringify({ filedata: wsap_data.csv() }));
+      },
+    });
+
+    var assigned_set = Math.random() < 0.5 ? "A" : "B";
+
+    // Generate a random subject ID
+    var subject_id = jsPsych.randomization.randomID(15);
+    jsPsych.data.addProperties({
+      subject: subject_id,
+      set_assigned: assigned_set,
+    });
+
+    // Load and parse the CSV data
+    Papa.parse("WSAP.csv", {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function (results) {
+        runExperiment(results.data);
+      },
+      error: function (error) {
+        alert("Error loading stimuli file: " + error);
+      },
+    });
+
+    function runExperiment(all_stimuli) {
+      var timeline = [];
+      var set_stimuli = all_stimuli.filter(function (trial) {
+        return trial.Test === assigned_set;
+      });
+
+      console.log(
+        "Total trials for Set " + assigned_set + ":",
+        set_stimuli.length
+      );
+
+      // Welcome screen
+      var welcome = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+              <div style="color: black; font-size: 18px;">
+                <p>Welcome to the experiment.</p>
+                <p>Press any key to continue.</p>
+              </div>
+            `,
+      };
+      timeline.push(welcome);
+
+      // Instructions
+      var instructions = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+    <div style="color: black; font-size: 16px; max-width: 700px; margin: 0 auto; text-align: center;">
+      <p>In this task, you will see a word followed by a sentence.</p>
+      <p>Your job is to decide whether the word and sentence are related.</p>
+      <br>
+      <p><strong>Here's what will happen on each trial:</strong></p>
+      <ol style="text-align: left; display: inline-block; margin: 0 auto;">
+        <li>A fixation cross (+) will appear briefly</li>
+        <li>A word will appear briefly</li>
+        <li>A sentence will appear - press the SPACEBAR when you finish reading it</li>
+        <li>You'll be asked if the word and sentence are related</li>
+      </ol>
+      <br><br>
+      <p><strong>To respond:</strong></p>
+      <p>Press <strong>1</strong> on the number pad if they ARE related</p>
+      <p>Press <strong>3</strong> on the number pad if they ARE NOT related</p>
+      <br>
+      <p>Press any key to begin.</p>
+    </div>
+  `,
+        post_trial_gap: 500,
+      };
+      timeline.push(instructions);
+      var randomized_stimuli = jsPsych.randomization.shuffle(set_stimuli);
+
+      // 1. Fixation cross (500ms)
+      var fixation = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '<div style="font-size: 60px; color: black;">+</div>',
+        choices: "NO_KEYS",
+        trial_duration: 500,
+        post_trial_gap: 0,
+      };
+
+      var prime = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function () {
+          var word = jsPsych.evaluateTimelineVariable("Word");
+          return (
+            '<div style="font-size: 12pt; color: black;">' + word + "</div>"
+          );
+        },
+        choices: "NO_KEYS",
+        trial_duration: 500,
+        post_trial_gap: 0,
+      };
+
+      var sentence = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function () {
+          var sent = jsPsych.evaluateTimelineVariable("Sentence");
+          return (
+            '<div style="font-size: 12pt; color: black; max-width: 800px; margin: 0 auto;">' +
+            sent +
+            "</div>"
+          );
+        },
+        choices: [" "],
+        post_trial_gap: 0,
+      };
+
+      // 4. Relatedness judgment
+      var judgment = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+              <div style="font-size: 12pt; color: black;">
+                <p>Were the word and sentence related?</p>
+                <br>
+                <p>Press <strong>1</strong> for YES (related)</p>
+                <p>Press <strong>3</strong> for NO (not related)</p>
+              </div>
+            `,
+        choices: ["1", "3"],
+        data: {
+          task: "wsap",
+          assigned_set: assigned_set,
+          word: jsPsych.timelineVariable("Word"),
+          sentence: jsPsych.timelineVariable("Sentence"),
+          trial_type: jsPsych.timelineVariable("Trial type"),
+          domain: jsPsych.timelineVariable("Domain"),
+        },
+        on_finish: function (data) {
+          data.related = data.response === "1";
+          data.endorsed_interpretation = data.trial_type;
+        },
+      };
+
+      var trial_procedure = {
+        timeline: [fixation, prime, sentence, judgment],
+        timeline_variables: randomized_stimuli,
+      };
+      timeline.push(trial_procedure);
+
+      // Debrief
+      var debrief = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+              <div style="color: black; font-size: 18px;">
+                <p>Thank you for participating!</p>
+                <p>You completed ${randomized_stimuli.length} trials.</p>
+                <br>
+                <p>Press any key to finish.</p>
+              </div>
+            `,
+      };
+      timeline.push(debrief);
+      jsPsych.run(timeline);
+    }
+  </script>
+</html>
