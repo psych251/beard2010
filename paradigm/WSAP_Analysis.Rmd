@@ -1,0 +1,1300 @@
+---
+title: "WSAP Data Analysis: Replicating Beard & Amir (2009)"
+author: "Eric Martz"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+# Introduction
+
+This analysis replicates the methodology from:
+
+**Beard, C., & Amir, N. (2009).** Interpretation in Social Anxiety: When Meaning Precedes Ambiguity. *Cognitive Therapy and Research, 33*(4), 406-415.
+
+## Study Overview
+
+The Word Sentence Association Paradigm (WSAP) assesses interpretation bias by having participants judge whether words (suggesting negative or benign interpretations) are related to ambiguous sentences.
+
+**Data Structure:**
+
+- **110 unique sentence-interpretation pairs** (Test A and Test B combined)
+- **220 total trials** (each sentence has both negative and benign interpretations)
+- **Domains:** GAD (Generalized Anxiety) and SAD (Social Anxiety)
+- **Interpretation types:** Negative vs. Benign
+
+---
+
+# Setup and Data Loading
+
+## Load Required Packages
+
+```{r load-packages}
+# Install packages if needed (uncomment to run once)
+# install.packages(c("tidyverse", "psych", "effsize", "ggpubr", "knitr", "kableExtra", "lsr"))
+
+library(tidyverse)    # Data manipulation and visualization
+library(psych)        # Descriptive statistics and reliability
+library(effsize)      # Effect size calculations
+library(ggpubr)       # Publication-ready plots
+library(knitr)        # Table formatting
+library(kableExtra)   # Enhanced table styling
+library(lsr)
+
+# Set theme for plots
+theme_set(theme_bw(base_size = 12))
+```
+
+## Configuration
+
+```{r config}
+
+PARTICIPANT_DATA_FOLDER <- "../data/" 
+
+CODING_FILE <- "interpretation_coding_reference.csv"
+
+# RT cleaning thresholds
+RT_MIN <- 0     # milliseconds
+RT_MAX <- 10000   # milliseconds
+
+# Output directory
+OUTPUT_DIR <- getwd()
+```
+
+## Load Interpretation Coding
+
+```{r load-interpretation-coding}
+# Load the interpretation coding from the reference file
+# This was extracted from the WSAP file provided by Professor Beard on her website
+interpretation_coding <- read_csv(CODING_FILE, show_col_types = FALSE)
+
+cat(" Loaded interpretation coding for", nrow(interpretation_coding), "trials\n\n")
+
+# Display summary
+cat("Breakdown by interpretation type:\n")
+print(table(interpretation_coding$interpretation_type))
+
+cat("\nBreakdown by domain:\n")
+print(table(interpretation_coding$domain))
+
+cat("\nBreakdown by test set:\n")
+print(table(interpretation_coding$test_set))
+
+# Display first few pairs
+cat("\n", strrep("=", 80), "\n")
+cat("SAMPLE WORD-SENTENCE PAIRS (First 10)\n")
+cat(strrep("=", 80), "\n")
+kable(head(interpretation_coding, 10),
+      caption = "First 10 Interpretation Pairs") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                full_width = FALSE, font_size = 11)
+```
+
+---
+
+# Data Preparation
+
+## Load Participant Data
+
+```{r load-participant-data}
+cat("\n", strrep("=", 80), "\n")
+cat("LOADING PARTICIPANT DATA\n")
+cat(strrep("=", 80), "\n")
+
+if (exists("PARTICIPANT_DATA_FOLDER") && dir.exists(PARTICIPANT_DATA_FOLDER)) {
+  cat("\n Loading from FOLDER:", PARTICIPANT_DATA_FOLDER, "\n")
+  
+  # Get list of all CSV files in folder
+  csv_files <- list.files(PARTICIPANT_DATA_FOLDER, 
+                          pattern = "\\.csv$", 
+                          full.names = TRUE,
+                          ignore.case = TRUE)
+  
+  cat("  Found", length(csv_files), "CSV file(s)\n\n")
+  
+  if (length(csv_files) == 0) {
+    stop("ERROR: No CSV files found in folder: ", PARTICIPANT_DATA_FOLDER)
+  }
+  
+  # Display files found
+  cat("Files to be loaded:\n")
+  for (i in seq_along(csv_files)) {
+    cat("  ", i, ". ", basename(csv_files[i]), "\n", sep = "")
+  }
+  cat("\n")
+  
+  # Read and combine all CSV files
+  df_list <- list()
+  for (i in seq_along(csv_files)) {
+    cat("Reading file", i, "of", length(csv_files), ":", basename(csv_files[i]), "\n")
+    
+    # Read file
+    temp_df <- read_csv(csv_files[i], show_col_types = FALSE)
+    
+    # If subject column doesn't exist, create one from filename
+    if (!"subject" %in% names(temp_df)) {
+      # Extract filename without extension as subject ID
+      subject_id <- tools::file_path_sans_ext(basename(csv_files[i]))
+      temp_df$subject <- subject_id
+      cat("  → Added subject ID:", subject_id, "\n")
+    }
+    
+    df_list[[i]] <- temp_df
+  }
+  
+  # Combine all dataframes
+  df_raw <- bind_rows(df_list)
+  cat("\n Successfully combined all files\n")
+  
+} else if (exists("PARTICIPANT_DATA_FILE") && file.exists(PARTICIPANT_DATA_FILE)) {
+  # OPTION 1: Load single CSV file
+  cat("\n Loading from FILE:", PARTICIPANT_DATA_FILE, "\n\n")
+  df_raw <- read_csv(PARTICIPANT_DATA_FILE, show_col_types = FALSE)
+  
+} else {
+  stop("\n\nERROR: Please specify either:\n",
+       "  - PARTICIPANT_DATA_FOLDER (folder with CSV files), or\n",
+       "  - PARTICIPANT_DATA_FILE (single CSV file)\n\n",
+       "Update the path in the Configuration section above.")
+}
+
+# Display data structure
+cat("\n=== DATA OVERVIEW ===\n")
+cat("Total rows:", nrow(df_raw), "\n")
+cat("Unique subjects:", n_distinct(df_raw$subject), "\n")
+cat("\nSubjects found:\n")
+print(sort(unique(df_raw$subject)))
+
+cat("\n\nColumn names:\n")
+print(names(df_raw))
+
+# Display first few rows
+cat("\nFirst 10 rows:\n")
+kable(head(df_raw %>% select(any_of(c("subject", "word", "sentence", "response", "rt", "domain"))), 10),
+      caption = "First 10 Rows of Participant Data") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Clean and Merge Data
+
+```{r clean-merge-data}
+cat("\n=== PREPARING DATA ===\n")
+
+# Convert response to binary
+# Assuming: "1" or 1 = endorsed (YES/related), "3" or 3 = not endorsed (NO/not related)
+df <- df_raw %>%
+  mutate(
+    endorsed = case_when(
+      response == "1" | response == 1 ~ 1,
+      response == "3" | response == 3 ~ 0,
+      TRUE ~ NA_real_
+    ),
+    rt = as.numeric(rt),
+    word = str_trim(word),
+    sentence = str_trim(sentence)
+  )
+
+# Merge with interpretation coding
+# Match on word and sentence
+df <- df %>%
+  left_join(
+    interpretation_coding %>% 
+      select(word, sentence, interpretation_type, domain_coded = domain),
+    by = c("word", "sentence")
+  )
+
+# Check for uncoded trials
+uncoded <- df %>%
+  filter(is.na(interpretation_type)) %>%
+  distinct(word, sentence)
+
+if (nrow(uncoded) > 0) {
+  cat("\nWARNING:", nrow(uncoded), "uncoded word-sentence pairs found!\n")
+  cat("\nUncoded pairs:\n")
+  print(uncoded)
+  cat("\nThese trials will be excluded from analysis.\n\n")
+} else {
+  cat("\n All trials successfully matched with interpretation coding!\n\n")
+}
+
+# Remove uncoded trials
+df <- df %>%
+  filter(!is.na(interpretation_type))
+
+# If domain not in participant data, use coded domain
+if (!"domain" %in% names(df)) {
+  df <- df %>% mutate(domain = domain_coded)
+}
+
+cat("Interpretation type distribution in participant data:\n")
+print(table(df$interpretation_type))
+
+cat("\nDomain distribution:\n")
+print(table(df$domain))
+
+cat("\nResponse distribution:\n")
+print(table(df$response, useNA = "ifany"))
+```
+
+## Clean Reaction Time Data
+
+```{r clean-rt}
+cat("\n=== CLEANING REACTION TIME DATA ===\n")
+
+initial_n <- nrow(df)
+
+# Remove RTs outside acceptable range
+df <- df %>%
+  filter(rt >= RT_MIN & rt <= RT_MAX)
+
+removed_n <- initial_n - nrow(df)
+removed_pct <- (removed_n / initial_n) * 100
+
+cat("Initial trials:", initial_n, "\n")
+cat("Removed (< ", RT_MIN, "ms or > ", RT_MAX, "ms): ", 
+    removed_n, " (", round(removed_pct, 1), "%)\n", sep = "")
+cat("Retained trials:", nrow(df), "\n")
+```
+
+---
+
+# Calculate Subject-Level Scores
+
+```{r calculate-scores}
+cat("\n=== CALCULATING SUBJECT-LEVEL SCORES ===\n")
+
+# Calculate scores for each participant
+subject_scores <- df %>%
+  group_by(subject) %>%
+  summarise(
+    n_trials = n(),
+    n_negative = sum(interpretation_type == "negative"),
+    n_benign = sum(interpretation_type == "benign"),
+    
+    # Endorsement rates
+    negative_endorsement = mean(endorsed[interpretation_type == "negative"], na.rm = TRUE),
+    benign_endorsement = mean(endorsed[interpretation_type == "benign"], na.rm = TRUE),
+    endorsement_bias = negative_endorsement - benign_endorsement,
+    
+    # RT for endorsed trials only
+    negative_rt = mean(rt[interpretation_type == "negative" & endorsed == 1], na.rm = TRUE),
+    benign_rt = mean(rt[interpretation_type == "benign" & endorsed == 1], na.rm = TRUE),
+    rt_bias = negative_rt - benign_rt,
+    
+    # Count endorsed trials
+    n_negative_endorsed = sum(interpretation_type == "negative" & endorsed == 1),
+    n_benign_endorsed = sum(interpretation_type == "benign" & endorsed == 1),
+    
+    .groups = "drop"
+  )
+
+cat("Calculated scores for", nrow(subject_scores), "participants\n\n")
+
+# Display subject scores
+kable(subject_scores, 
+      digits = 3,
+      caption = "Subject-Level Bias Scores") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                full_width = FALSE,
+                font_size = 11) %>%
+  scroll_box(width = "100%", height = "400px")
+
+# Descriptive statistics
+cat("\n=== DESCRIPTIVE STATISTICS ===\n")
+desc_stats <- describe(subject_scores %>% 
+           select(negative_endorsement, benign_endorsement, endorsement_bias,
+                  negative_rt, benign_rt, rt_bias))
+
+kable(desc_stats %>% 
+        select(mean, sd, min, max, se), 
+      digits = 3, 
+      caption = "Summary Statistics") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+# Group Assignment (for Beard & Amir 2009 Replication)
+
+The original Beard & Amir (2009) study compared **High Social Anxiety (HSA)** vs **Low Social Anxiety (LSA)** groups using a mixed ANOVA.
+
+## Create Groups Based on Anxiety Scores
+
+```{r group-assignment}
+cat("\n=== GROUP ASSIGNMENT (SPIN Percentile-Based) ===\n")
+
+# Extract SPIN scores from participant data
+spin_scores <- df_raw %>%
+  filter(!is.na(spin_total)) %>%
+  group_by(subject) %>%
+  summarise(
+    SPIN = first(spin_total),
+    .groups = "drop"
+  )
+
+# Merge with subject scores
+subject_scores <- subject_scores %>%
+  left_join(spin_scores, by = "subject")
+
+# Calculate 30th and 70th percentiles
+percentile_30 <- quantile(subject_scores$SPIN, 0.30, na.rm = TRUE)
+percentile_70 <- quantile(subject_scores$SPIN, 0.70, na.rm = TRUE)
+
+cat("\nSPIN Percentile Cutoffs:\n")
+cat("  30th percentile:", percentile_30, "\n")
+cat("  70th percentile:", percentile_70, "\n\n")
+
+# Assign groups based on percentiles
+subject_scores <- subject_scores %>%
+  mutate(
+    group = case_when(
+      SPIN <= percentile_30 ~ "LSA",        # Bottom 30%
+      SPIN >= percentile_70 ~ "HSA",        # Top 30%
+      TRUE ~ "Moderate"                      # Middle 40%
+    )
+  )
+
+cat("Group Assignment:\n")
+cat("  LSA (Low Social Anxiety):  SPIN ≤", percentile_30, "(bottom 30%)\n")
+cat("  HSA (High Social Anxiety): SPIN ≥", percentile_70, "(top 30%)\n")
+cat("  Moderate (excluded):       SPIN between", percentile_30, "and", percentile_70, "\n\n")
+
+# Show group distribution
+cat("Group Distribution:\n")
+group_table <- table(subject_scores$group)
+print(group_table)
+
+# Show individual assignments
+cat("\n\nIndividual Participant Assignments:\n")
+kable(subject_scores %>% 
+        select(subject, SPIN, group, endorsement_bias) %>%
+        arrange(SPIN),
+      digits = 3) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Extract STAI and BDI scores
+stai_scores <- df_raw %>%
+  filter(!is.na(stai_state_total) | !is.na(stai_trait_total)) %>%
+  group_by(subject) %>%
+  summarise(
+    STAI_state = first(na.omit(stai_state_total)),
+    STAI_trait = first(na.omit(stai_trait_total)),
+    .groups = "drop"
+  )
+
+bdi_scores <- df_raw %>%
+  filter(!is.na(bdi_total)) %>%
+  group_by(subject) %>%
+  summarise(
+    BDI = first(bdi_total),
+    .groups = "drop"
+  )
+
+subject_scores <- subject_scores %>%
+  left_join(stai_scores, by = "subject") %>%
+  left_join(bdi_scores, by = "subject")
+
+# Check if we have enough for group analyses
+if ("HSA" %in% names(group_table) && "LSA" %in% names(group_table)) {
+  n_hsa <- as.numeric(group_table["HSA"])
+  n_lsa <- as.numeric(group_table["LSA"])
+  
+  cat("\n\nSample Size:\n")
+  cat("  HSA:", n_hsa, "\n")
+  cat("  LSA:", n_lsa, "\n")
+  
+  if (n_hsa >= 10 && n_lsa >= 10) {
+    cat("\n Sufficient for Mixed ANOVA\n")
+    has_groups <- TRUE
+  } else {
+    cat("\n Small sample (need ≥10 per group for Mixed ANOVA)\n")
+    has_groups <- (n_hsa + n_lsa) >= 10
+  }
+  
+  subject_scores_grouped <- subject_scores %>%
+    filter(group %in% c("HSA", "LSA"))
+    
+} else {
+  cat("\n Not enough range in SPIN scores\n")
+  has_groups <- FALSE
+  subject_scores_grouped <- NULL
+}
+
+cat("\n Group assignment complete!\n")
+```
+
+---
+
+# Statistical Analyses
+
+## PART A: Within-Subjects Analyses (All Participants)
+
+### 1. Endorsement Rate Analysis
+
+### Paired t-test: Negative vs. Benign Endorsement
+
+```{r endorsement-ttest}
+cat("\n=== ENDORSEMENT RATE COMPARISON ===\n")
+cat("Comparing: Negative vs. Benign Interpretation Endorsement\n\n")
+
+# Paired t-test
+endorsement_test <- t.test(
+  subject_scores$negative_endorsement,
+  subject_scores$benign_endorsement,
+  paired = TRUE
+)
+
+# Calculate Cohen's d for paired samples
+endorsement_diff <- subject_scores$negative_endorsement - subject_scores$benign_endorsement
+cohens_d_endorse <- mean(endorsement_diff, na.rm = TRUE) / sd(endorsement_diff, na.rm = TRUE)
+
+# Display results
+cat("Negative endorsement: M =", round(mean(subject_scores$negative_endorsement, na.rm = TRUE), 3),
+    ", SD =", round(sd(subject_scores$negative_endorsement, na.rm = TRUE), 3), "\n")
+cat("Benign endorsement:   M =", round(mean(subject_scores$benign_endorsement, na.rm = TRUE), 3),
+    ", SD =", round(sd(subject_scores$benign_endorsement, na.rm = TRUE), 3), "\n\n")
+
+cat("Paired t-test results:\n")
+cat("t(", endorsement_test$parameter, ") = ", round(endorsement_test$statistic, 3),
+    ", p = ", format.pval(endorsement_test$p.value, digits = 4),
+    ", Cohen's d = ", round(cohens_d_endorse, 3), "\n", sep = "")
+
+if (endorsement_test$p.value < 0.05) {
+  direction <- ifelse(mean(subject_scores$negative_endorsement) > mean(subject_scores$benign_endorsement),
+                     "HIGHER", "LOWER")
+  cat("\n SIGNIFICANT: Negative endorsement is", direction, "than benign (p < .05)\n")
+  cat("   Interpretation: ", 
+      ifelse(direction == "HIGHER", 
+             "Participants showed bias toward NEGATIVE interpretations",
+             "Participants showed bias toward BENIGN interpretations"), "\n")
+} else {
+  cat("\nNot significant (p ≥ .05)\n")
+  cat("   No significant interpretation bias detected.\n")
+}
+
+# Effect size interpretation
+cat("\nEffect size interpretation (Cohen's d = ", round(cohens_d_endorse, 3), "):\n", sep = "")
+if (abs(cohens_d_endorse) < 0.2) {
+  cat("   Negligible effect\n")
+} else if (abs(cohens_d_endorse) < 0.5) {
+  cat("   SMALL effect\n")
+} else if (abs(cohens_d_endorse) < 0.8) {
+  cat("   MEDIUM effect\n")
+} else {
+  cat("   LARGE effect\n")
+}
+```
+
+## 2. Response Time Analysis (Endorsed Trials Only)
+
+### Paired t-test: Negative vs. Benign RT
+
+```{r rt-ttest}
+cat("\n=== RESPONSE TIME COMPARISON (Endorsed Trials) ===\n")
+
+# Remove participants with missing RT data
+rt_complete <- subject_scores %>%
+  filter(!is.na(negative_rt) & !is.na(benign_rt))
+
+cat("Participants with complete RT data:", nrow(rt_complete), "\n\n")
+
+if (nrow(rt_complete) > 1) {
+  # Paired t-test
+  rt_test <- t.test(
+    rt_complete$negative_rt,
+    rt_complete$benign_rt,
+    paired = TRUE
+  )
+  
+  # Calculate Cohen's d
+  rt_diff <- rt_complete$negative_rt - rt_complete$benign_rt
+  cohens_d_rt <- mean(rt_diff, na.rm = TRUE) / sd(rt_diff, na.rm = TRUE)
+  
+  # Display results
+  cat("Negative RT: M =", round(mean(rt_complete$negative_rt, na.rm = TRUE), 1), "ms",
+      ", SD =", round(sd(rt_complete$negative_rt, na.rm = TRUE), 1), "ms\n")
+  cat("Benign RT:   M =", round(mean(rt_complete$benign_rt, na.rm = TRUE), 1), "ms",
+      ", SD =", round(sd(rt_complete$benign_rt, na.rm = TRUE), 1), "ms\n\n")
+  
+  cat("Paired t-test results:\n")
+  cat("t(", rt_test$parameter, ") = ", round(rt_test$statistic, 3),
+      ", p = ", format.pval(rt_test$p.value, digits = 4),
+      ", Cohen's d = ", round(cohens_d_rt, 3), "\n", sep = "")
+  
+  if (rt_test$p.value < 0.05) {
+    direction <- ifelse(mean(rt_complete$negative_rt) < mean(rt_complete$benign_rt),
+                       "FASTER", "SLOWER")
+    cat("\n SIGNIFICANT: Negative RT is", direction, "than benign (p < .05)\n")
+    cat("   Interpretation: ",
+        ifelse(direction == "FASTER",
+               "Negative interpretations accessed more AUTOMATICALLY",
+               "Negative interpretations processed more EFFORTFULLY"), "\n")
+  } else {
+    cat("\nNot significant (p ≥ .05)\n")
+    cat("   No significant RT difference.\n")
+  }
+  
+  # Effect size interpretation
+  cat("\nEffect size interpretation (Cohen's d = ", round(cohens_d_rt, 3), "):\n", sep = "")
+  if (abs(cohens_d_rt) < 0.2) {
+    cat("   Negligible effect\n")
+  } else if (abs(cohens_d_rt) < 0.5) {
+    cat("   SMALL effect\n")
+  } else if (abs(cohens_d_rt) < 0.8) {
+    cat("   MEDIUM effect\n")
+  } else {
+    cat("   LARGE effect\n")
+  }
+} else {
+  cat("Insufficient data for RT analysis (need at least 2 participants)\n")
+}
+```
+
+## 3. Endorsement Bias Score (One-Sample t-test vs. Zero)
+
+```{r bias-onesample}
+cat("\n=== ENDORSEMENT BIAS SCORE (Test Against Zero) ===\n")
+
+# One-sample t-test against zero
+bias_test <- t.test(subject_scores$endorsement_bias, mu = 0)
+
+# Cohen's d against zero
+cohens_d_bias <- mean(subject_scores$endorsement_bias, na.rm = TRUE) / 
+                 sd(subject_scores$endorsement_bias, na.rm = TRUE)
+
+cat("Endorsement bias: M =", round(mean(subject_scores$endorsement_bias, na.rm = TRUE), 3),
+    ", SD =", round(sd(subject_scores$endorsement_bias, na.rm = TRUE), 3), "\n")
+cat("(Bias = Negative endorsement - Benign endorsement)\n\n")
+
+cat("One-sample t-test (vs. 0):\n")
+cat("t(", bias_test$parameter, ") = ", round(bias_test$statistic, 3),
+    ", p = ", format.pval(bias_test$p.value, digits = 4),
+    ", Cohen's d = ", round(cohens_d_bias, 3), "\n", sep = "")
+
+if (bias_test$p.value < 0.05) {
+  direction <- ifelse(mean(subject_scores$endorsement_bias) > 0, "POSITIVE", "NEGATIVE")
+  cat("\n SIGNIFICANT", direction, "bias (p < .05)\n")
+  cat("   Interpretation: Participants show ",
+      ifelse(direction == "POSITIVE",
+             "systematic bias toward NEGATIVE interpretations",
+             "systematic bias toward BENIGN interpretations"), "\n", sep = "")
+} else {
+  cat("\nNot significant (p ≥ .05)\n")
+  cat("   Bias score not significantly different from zero.\n")
+}
+```
+
+## 4. Analysis by Domain
+
+```{r domain-analysis}
+cat("\n=== ANALYSIS BY ANXIETY DOMAIN ===\n")
+
+# Calculate domain-specific bias
+domain_scores <- df %>%
+  group_by(subject, domain) %>%
+  summarise(
+    negative_endorsement = mean(endorsed[interpretation_type == "negative"], na.rm = TRUE),
+    benign_endorsement = mean(endorsed[interpretation_type == "benign"], na.rm = TRUE),
+    endorsement_bias = negative_endorsement - benign_endorsement,
+    .groups = "drop"
+  )
+
+# Descriptive statistics by domain
+domain_summary <- domain_scores %>%
+  group_by(domain) %>%
+  summarise(
+    n = n(),
+    mean_bias = mean(endorsement_bias, na.rm = TRUE),
+    sd_bias = sd(endorsement_bias, na.rm = TRUE),
+    se_bias = sd_bias / sqrt(n),
+    .groups = "drop"
+  )
+
+cat("\nEndorsement Bias by Domain:\n")
+kable(domain_summary, digits = 3,
+      col.names = c("Domain", "N", "Mean Bias", "SD", "SE"),
+      caption = "Endorsement Bias by Anxiety Domain") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Test if bias differs between domains (if both domains present)
+if (n_distinct(domain_scores$domain) == 2) {
+  # Reshape for paired t-test
+  domain_wide <- domain_scores %>%
+    pivot_wider(names_from = domain, 
+                values_from = endorsement_bias,
+                names_prefix = "bias_")
+  
+  # Check if we have paired data
+  domain_cols <- grep("bias_", names(domain_wide), value = TRUE)
+  
+  if (length(domain_cols) == 2 && sum(complete.cases(domain_wide[domain_cols])) > 1) {
+    domain_test <- t.test(domain_wide[[domain_cols[1]]], 
+                          domain_wide[[domain_cols[2]]], 
+                          paired = TRUE)
+    
+    cat("\n\nPaired t-test: GAD vs. SAD domain bias\n")
+    cat("t(", domain_test$parameter, ") = ", round(domain_test$statistic, 3),
+        ", p = ", format.pval(domain_test$p.value, digits = 4), "\n", sep = "")
+    
+    if (domain_test$p.value < 0.05) {
+      cat(" Significant difference between domains (p < .05)\n")
+    } else {
+      cat("No significant difference between domains (p ≥ .05)\n")
+    }
+  }
+}
+```
+
+---
+
+
+### 5. Mixed ANOVA: Group × Interpretation Type
+
+```{r mixed-anova-endorsement}
+if (!is.null(subject_scores_grouped) && nrow(subject_scores_grouped) >= 10) {
+  
+  # Prepare data in long format for ANOVA
+  anova_data_endorse <- subject_scores_grouped %>%
+    select(subject, group, negative_endorsement, benign_endorsement) %>%
+    pivot_longer(cols = c(negative_endorsement, benign_endorsement),
+                 names_to = "interpretation_type",
+                 values_to = "endorsement_rate") %>%
+    mutate(
+      interpretation_type = factor(
+        interpretation_type,
+        levels = c("benign_endorsement", "negative_endorsement"),
+        labels = c("Benign", "Negative")
+      ),
+      group = factor(group, levels = c("LSA", "HSA"))
+    )
+  
+  # Run mixed ANOVA
+  anova_result_endorse <- aov(endorsement_rate ~ group * interpretation_type + 
+                               Error(subject/interpretation_type), 
+                             data = anova_data_endorse)
+  
+  cat("ANOVA Results:\n")
+  print(summary(anova_result_endorse))
+  
+  # Calculate effect sizes (partial eta squared)
+  # For the interaction
+  library(lsr)
+  eta_sq <- etaSquared(anova_result_endorse, type = 2, anova = TRUE)
+  
+  cat("\n\nEffect Sizes (Partial η²):\n")
+  print(eta_sq)
+  
+  # Descriptive statistics by group and interpretation type
+  cat("\n\nDescriptive Statistics:\n")
+  desc_by_group <- anova_data_endorse %>%
+    group_by(group, interpretation_type) %>%
+    summarise(
+      n = n(),
+      mean = mean(endorsement_rate, na.rm = TRUE),
+      sd = sd(endorsement_rate, na.rm = TRUE),
+      se = sd / sqrt(n),
+      .groups = "drop"
+    )
+  
+  kable(desc_by_group, digits = 3,
+        caption = "Mean Endorsement Rates by Group and Interpretation Type") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"))
+  
+  # POST-HOC TESTS
+  cat("\n\n=== POST-HOC COMPARISONS ===\n\n")
+  
+  # 1. Within-group comparisons (Negative vs Benign)
+  cat("1. WITHIN-GROUP COMPARISONS (Paired t-tests):\n\n")
+  
+  for (grp in c("HSA", "LSA")) {
+    grp_data <- subject_scores_grouped %>% filter(group == grp)
+    
+    if (nrow(grp_data) >= 3) {
+      t_result <- t.test(grp_data$negative_endorsement, 
+                        grp_data$benign_endorsement, 
+                        paired = TRUE)
+      
+      diff <- grp_data$negative_endorsement - grp_data$benign_endorsement
+      d <- mean(diff) / sd(diff)
+      
+      cat("  ", grp, " group (n=", nrow(grp_data), "):\n", sep = "")
+      cat("    Negative: M = ", round(mean(grp_data$negative_endorsement), 3), 
+          ", SD = ", round(sd(grp_data$negative_endorsement), 3), "\n", sep = "")
+      cat("    Benign:   M = ", round(mean(grp_data$benign_endorsement), 3),
+          ", SD = ", round(sd(grp_data$benign_endorsement), 3), "\n", sep = "")
+      cat("    t(", t_result$parameter, ") = ", round(t_result$statistic, 3),
+          ", p = ", format.pval(t_result$p.value, digits = 3),
+          ", d = ", round(d, 3), "\n", sep = "")
+      
+      if (t_result$p.value < 0.05) {
+        cat("    Significant difference\n\n")
+      } else {
+        cat("    Not significant\n\n")
+      }
+    }
+  }
+  
+  # 2. Between-group comparisons (HSA vs LSA)
+  cat("2. BETWEEN-GROUP COMPARISONS (Independent t-tests):\n\n")
+  
+  for (interp in c("negative", "benign")) {
+    if (interp == "negative") {
+      hsa_vals <- subject_scores_grouped %>% filter(group == "HSA") %>% pull(negative_endorsement)
+      lsa_vals <- subject_scores_grouped %>% filter(group == "LSA") %>% pull(negative_endorsement)
+      label <- "Negative interpretations"
+    } else {
+      hsa_vals <- subject_scores_grouped %>% filter(group == "HSA") %>% pull(benign_endorsement)
+      lsa_vals <- subject_scores_grouped %>% filter(group == "LSA") %>% pull(benign_endorsement)
+      label <- "Benign interpretations"
+    }
+    
+    t_result <- t.test(hsa_vals, lsa_vals, var.equal = FALSE)
+    d <- cohen.d(hsa_vals, lsa_vals)$estimate
+    
+    cat("  ", label, ":\n", sep = "")
+    cat("    HSA: M = ", round(mean(hsa_vals), 3), ", SD = ", round(sd(hsa_vals), 3), "\n", sep = "")
+    cat("    LSA: M = ", round(mean(lsa_vals), 3), ", SD = ", round(sd(lsa_vals), 3), "\n", sep = "")
+    cat("    t(", round(t_result$parameter, 1), ") = ", round(t_result$statistic, 3),
+        ", p = ", format.pval(t_result$p.value, digits = 3),
+        ", d = ", round(d, 3), "\n", sep = "")
+    
+    if (t_result$p.value < 0.05) {
+      cat("    Significant group difference\n\n")
+    } else {
+      cat("    Not significant\n\n")
+    }
+  }
+  
+  # 3. Endorsement bias between groups
+  cat("3. ENDORSEMENT BIAS COMPARISON (HSA vs LSA):\n\n")
+  
+  hsa_bias <- subject_scores_grouped %>% filter(group == "HSA") %>% pull(endorsement_bias)
+  lsa_bias <- subject_scores_grouped %>% filter(group == "LSA") %>% pull(endorsement_bias)
+  
+  bias_t <- t.test(hsa_bias, lsa_bias, var.equal = FALSE)
+  bias_d <- cohen.d(hsa_bias, lsa_bias)$estimate
+  
+  cat("  HSA bias: M = ", round(mean(hsa_bias), 3), ", SD = ", round(sd(hsa_bias), 3), "\n", sep = "")
+  cat("  LSA bias: M = ", round(mean(lsa_bias), 3), ", SD = ", round(sd(lsa_bias), 3), "\n", sep = "")
+  cat("  t(", round(bias_t$parameter, 1), ") = ", round(bias_t$statistic, 3),
+      ", p = ", format.pval(bias_t$p.value, digits = 3),
+      ", d = ", round(bias_d, 3), "\n", sep = "")
+  
+  if (bias_t$p.value < 0.05) {
+    cat("   HSA shows significantly ", 
+        ifelse(mean(hsa_bias) > mean(lsa_bias), "greater", "less"),
+        " bias than LSA\n")
+  } else {
+    cat("  No significant group difference in bias\n")
+  }
+  
+} else {
+  cat("\nMIXED ANOVA SKIPPED FOR NOW\n")
+  cat("   Insufficient sample size (this analysis will be done once Pilot B is completed and I have sufficient data)\n")
+
+}
+```
+
+### 6. Mixed ANOVA: Response Times (Group × Interpretation)
+
+```{r mixed-anova-rt}
+if (!is.null(subject_scores_grouped) && nrow(subject_scores_grouped) >= 10) {
+  
+  cat("\n", strrep("=", 80), "\n")
+  cat("MIXED ANOVA: RESPONSE TIMES (Endorsed Trials Only)\n")
+  cat(strrep("=", 80), "\n\n")
+  
+  # Prepare RT data
+  anova_data_rt <- subject_scores_grouped %>%
+    filter(!is.na(negative_rt) & !is.na(benign_rt)) %>%
+    select(subject, group, negative_rt, benign_rt) %>%
+    pivot_longer(cols = c(negative_rt, benign_rt),
+                 names_to = "interpretation_type",
+                 values_to = "rt") %>%
+    mutate(
+      interpretation_type = factor(
+        interpretation_type,
+        levels = c("benign_rt", "negative_rt"),
+        labels = c("Benign", "Negative")
+      ),
+      group = factor(group, levels = c("LSA", "HSA"))
+    )
+  
+  if (nrow(anova_data_rt) > 0) {
+    # Run mixed ANOVA for RT
+    anova_result_rt <- aov(rt ~ group * interpretation_type + 
+                          Error(subject/interpretation_type), 
+                          data = anova_data_rt)
+    
+    cat("ANOVA Results:\n")
+    print(summary(anova_result_rt))
+    
+    # Descriptive statistics
+    cat("\n\nDescriptive Statistics:\n")
+    desc_rt_by_group <- anova_data_rt %>%
+      group_by(group, interpretation_type) %>%
+      summarise(
+        n = n(),
+        mean_rt = mean(rt, na.rm = TRUE),
+        sd_rt = sd(rt, na.rm = TRUE),
+        se_rt = sd_rt / sqrt(n),
+        .groups = "drop"
+      )
+    
+    kable(desc_rt_by_group, digits = 1,
+          caption = "Mean Response Times by Group and Interpretation Type") %>%
+      kable_styling(bootstrap_options = c("striped", "hover"))
+    
+  } else {
+      cat("\nMIXED ANOVA SKIPPED FOR NOW\n")
+      cat("   Insufficient sample size (this analysis will be done once Pilot B is completed and I have sufficient data)\n")
+  }
+}
+```
+
+### 7. Correlations with Anxiety Measures
+
+```{r anxiety-correlations}
+cat("\n=== CORRELATIONS WITH ANXIETY MEASURES ===\n\n")
+
+# Check for anxiety measures
+anxiety_vars <- names(subject_scores)[names(subject_scores) %in% 
+                                      c("SIAS", "sias", "SPS", "sps", "LSAS", "lsas")]
+
+if (length(anxiety_vars) > 0) {
+  cat("Found anxiety measures:", paste(anxiety_vars, collapse = ", "), "\n\n")
+  
+  # Create correlation table
+  cor_results <- tibble(
+    Measure = character(),
+    r_endorsement = numeric(),
+    p_endorsement = numeric(),
+    r_rt = numeric(),
+    p_rt = numeric()
+  )
+  
+  for (var in anxiety_vars) {
+    # Correlation with endorsement bias
+    cor_endorse <- cor.test(subject_scores[[var]], 
+                            subject_scores$endorsement_bias,
+                            use = "complete.obs")
+    
+    # Correlation with RT bias (if available)
+    if (sum(!is.na(subject_scores$rt_bias)) > 2) {
+      cor_rt <- cor.test(subject_scores[[var]], 
+                        subject_scores$rt_bias,
+                        use = "complete.obs")
+      r_rt <- cor_rt$estimate
+      p_rt <- cor_rt$p.value
+    } else {
+      r_rt <- NA
+      p_rt <- NA
+    }
+    
+    cor_results <- bind_rows(cor_results, tibble(
+      Measure = var,
+      r_endorsement = cor_endorse$estimate,
+      p_endorsement = cor_endorse$p.value,
+      r_rt = r_rt,
+      p_rt = p_rt
+    ))
+    
+    cat(var, " × Endorsement Bias: r = ", round(cor_endorse$estimate, 3),
+        ", p = ", format.pval(cor_endorse$p.value, digits = 3),
+        ifelse(cor_endorse$p.value < 0.05, " ", ""), "\n", sep = "")
+  }
+  
+  cat("\n")
+  kable(cor_results, digits = 3,
+        caption = "Correlations Between Anxiety Measures and Bias Scores") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"))
+  
+} else {
+    cat("\nMIXED ANOVA SKIPPED FOR NOW\n")
+  cat("   Insufficient sample size (this analysis will be done once Pilot B is completed and I have sufficient data)\n")
+}
+```
+
+---
+
+# Visualizations
+
+## Figure 1: Endorsement Rates
+
+```{r fig-endorsement, fig.width=12, fig.height=6}
+# Prepare data for plotting
+endorse_plot_data <- subject_scores %>%
+  select(subject, negative_endorsement, benign_endorsement) %>%
+  pivot_longer(cols = c(negative_endorsement, benign_endorsement),
+               names_to = "interpretation_type",
+               values_to = "endorsement_rate") %>%
+  mutate(interpretation_type = factor(interpretation_type,
+                                     levels = c("negative_endorsement", "benign_endorsement"),
+                                     labels = c("Negative", "Benign")))
+
+# Plot 1: Mean endorsement rates with error bars
+p1 <- endorse_plot_data %>%
+  group_by(interpretation_type) %>%
+  summarise(
+    mean = mean(endorsement_rate, na.rm = TRUE),
+    se = sd(endorsement_rate, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = interpretation_type, y = mean, fill = interpretation_type)) +
+  geom_bar(stat = "identity", width = 0.6, color = "black", alpha = 0.7) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.2, size = 1) +
+  geom_text(aes(label = sprintf("%.3f", mean)), 
+            vjust = -1.5, size = 5, fontface = "bold") +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray40", size = 0.8) +
+  scale_fill_manual(values = c("Negative" = "#d62728", "Benign" = "#2ca02c")) +
+  labs(title = "Mean Endorsement Rates",
+       subtitle = "Error bars show ±1 SE",
+       x = "Interpretation Type",
+       y = "Endorsement Rate") +
+  ylim(0, 1) +
+  theme_bw(base_size = 14) +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 16),
+        axis.title = element_text(face = "bold"))
+
+# Plot 2: Distribution of bias scores
+p2 <- ggplot(subject_scores, aes(x = endorsement_bias)) +
+  geom_histogram(bins = 15, fill = "steelblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = mean(subject_scores$endorsement_bias, na.rm = TRUE),
+             color = "darkblue", linetype = "solid", size = 1.2) +
+  annotate("text", 
+           x = mean(subject_scores$endorsement_bias, na.rm = TRUE),
+           y = Inf,
+           label = sprintf("Mean = %.3f", mean(subject_scores$endorsement_bias, na.rm = TRUE)),
+           vjust = 2, hjust = ifelse(mean(subject_scores$endorsement_bias) > 0, -0.1, 1.1),
+           size = 4.5, fontface = "bold") +
+  labs(title = "Distribution of Endorsement Bias Scores",
+       subtitle = "Negative - Benign",
+       x = "Endorsement Bias Score",
+       y = "Frequency") +
+  theme_bw(base_size = 14) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        axis.title = element_text(face = "bold"))
+
+# Combine plots
+ggarrange(p1, p2, ncol = 2, labels = c("A", "B"))
+```
+
+## Figure 2: Response Times
+
+```{r fig-rt, fig.width=12, fig.height=6}
+# Prepare data for RT plotting
+rt_plot_data <- subject_scores %>%
+  filter(!is.na(negative_rt) & !is.na(benign_rt)) %>%
+  select(subject, negative_rt, benign_rt) %>%
+  pivot_longer(cols = c(negative_rt, benign_rt),
+               names_to = "interpretation_type",
+               values_to = "rt") %>%
+  mutate(interpretation_type = factor(interpretation_type,
+                                     levels = c("negative_rt", "benign_rt"),
+                                     labels = c("Negative", "Benign")))
+
+if (nrow(rt_plot_data) > 0) {
+  # Plot 1: Mean RTs with error bars
+  p3 <- rt_plot_data %>%
+    group_by(interpretation_type) %>%
+    summarise(
+      mean = mean(rt, na.rm = TRUE),
+      se = sd(rt, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    ) %>%
+    ggplot(aes(x = interpretation_type, y = mean, fill = interpretation_type)) +
+    geom_bar(stat = "identity", width = 0.6, color = "black", alpha = 0.7) +
+    geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.2, size = 1) +
+    geom_text(aes(label = sprintf("%.0f", mean)), 
+              vjust = -1.5, size = 5, fontface = "bold") +
+    scale_fill_manual(values = c("Negative" = "#d62728", "Benign" = "#2ca02c")) +
+    labs(title = "Mean Response Times (Endorsed Trials)",
+         subtitle = "Error bars show ±1 SE",
+         x = "Interpretation Type",
+         y = "Response Time (ms)") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "none",
+          plot.title = element_text(face = "bold", size = 16),
+          axis.title = element_text(face = "bold"))
+  
+  # Plot 2: RT bias distribution
+  p4 <- subject_scores %>%
+    filter(!is.na(rt_bias)) %>%
+    ggplot(aes(x = rt_bias)) +
+    geom_histogram(bins = 15, fill = "coral", color = "black", alpha = 0.7) +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed", size = 1) +
+    geom_vline(xintercept = mean(subject_scores$rt_bias, na.rm = TRUE),
+               color = "darkred", linetype = "solid", size = 1.2) +
+    annotate("text", 
+             x = mean(subject_scores$rt_bias, na.rm = TRUE),
+             y = Inf,
+             label = sprintf("Mean = %.1f ms", mean(subject_scores$rt_bias, na.rm = TRUE)),
+             vjust = 2, hjust = ifelse(mean(subject_scores$rt_bias) > 0, -0.1, 1.1),
+             size = 4.5, fontface = "bold") +
+    labs(title = "Distribution of RT Bias Scores",
+         subtitle = "Negative - Benign (ms)",
+         x = "RT Bias Score (ms)",
+         y = "Frequency") +
+    theme_bw(base_size = 14) +
+    theme(plot.title = element_text(face = "bold", size = 16),
+          axis.title = element_text(face = "bold"))
+  
+  # Combine plots
+  ggarrange(p3, p4, ncol = 2, labels = c("A", "B"))
+} else {
+  cat("No RT data available for plotting\n")
+}
+```
+
+## Figure 3: Domain-Specific Bias
+
+```{r fig-domain, fig.width=10, fig.height=6}
+if (n_distinct(domain_scores$domain) > 1) {
+  ggplot(domain_scores, aes(x = domain, y = endorsement_bias, fill = domain)) +
+    geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(width = 0.2, alpha = 0.5, size = 2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+    stat_summary(fun = mean, geom = "point", shape = 23, size = 4, 
+                 fill = "white", color = "black") +
+    scale_fill_brewer(palette = "Set2") +
+    labs(title = "Endorsement Bias by Anxiety Domain",
+         subtitle = "Diamond = mean, Box = median/IQR, Points = individual participants",
+         x = "Anxiety Domain",
+         y = "Endorsement Bias Score") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "none",
+          plot.title = element_text(face = "bold", size = 16),
+          axis.title = element_text(face = "bold"))
+}
+```
+
+## Figure 4: Correlation Between Bias Scores
+
+```{r fig-correlation, fig.width=8, fig.height=8}
+if (nrow(subject_scores) > 5) {
+  # Calculate correlation
+  corr_data <- subject_scores %>%
+    filter(!is.na(endorsement_bias) & !is.na(rt_bias))
+  
+  if (nrow(corr_data) > 2) {
+    corr_test <- cor.test(corr_data$endorsement_bias, corr_data$rt_bias)
+    
+    # Create scatter plot
+    ggplot(corr_data, aes(x = endorsement_bias, y = rt_bias)) +
+      geom_point(size = 4, alpha = 0.6, color = "purple") +
+      geom_smooth(method = "lm", se = TRUE, color = "red", fill = "pink", alpha = 0.2) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "gray40") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+      annotate("text", x = -Inf, y = Inf,
+               label = sprintf("r = %.3f\np = %.4f", 
+                             corr_test$estimate, corr_test$p.value),
+               hjust = -0.1, vjust = 2, size = 5.5, fontface = "bold",
+               color = ifelse(corr_test$p.value < 0.05, "darkgreen", "black")) +
+      labs(title = "Relationship Between Endorsement and RT Bias",
+           subtitle = "Each point represents one participant",
+           x = "Endorsement Bias Score",
+           y = "RT Bias Score (ms)") +
+      theme_bw(base_size = 14) +
+      theme(plot.title = element_text(face = "bold", size = 16),
+            axis.title = element_text(face = "bold"))
+  }
+}
+```
+
+## Figure 5: Group × Interpretation Interaction (Beard & Amir 2009 Key Figure)
+
+```{r fig-interaction, fig.width=12, fig.height=6}
+if (!is.null(subject_scores_grouped) && nrow(subject_scores_grouped) >= 10) {
+  
+  # Prepare data for interaction plot
+  interaction_data <- subject_scores_grouped %>%
+    select(subject, group, negative_endorsement, benign_endorsement) %>%
+    pivot_longer(cols = c(negative_endorsement, benign_endorsement),
+                 names_to = "interpretation_type",
+                 values_to = "endorsement_rate") %>%
+    mutate(interpretation_type = factor(interpretation_type,
+                                       levels = c("benign_endorsement", "negative_endorsement"),
+                                       labels = c("Benign", "Negative")))
+  
+  # Calculate means and SEs for plotting
+  interaction_summary <- interaction_data %>%
+    group_by(group, interpretation_type) %>%
+    summarise(
+      mean = mean(endorsement_rate, na.rm = TRUE),
+      se = sd(endorsement_rate, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+  
+  # Plot 1: Line plot showing interaction
+  p_interaction <- ggplot(interaction_summary, 
+                         aes(x = interpretation_type, y = mean, 
+                             group = group, color = group, shape = group)) +
+    geom_line(size = 1.5) +
+    geom_point(size = 5) +
+    geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.1, size = 1) +
+    scale_color_manual(values = c("LSA" = "#2ca02c", "HSA" = "#d62728"),
+                      labels = c("LSA" = "Low Social Anxiety", "HSA" = "High Social Anxiety")) +
+    scale_shape_manual(values = c("LSA" = 16, "HSA" = 17),
+                      labels = c("LSA" = "Low Social Anxiety", "HSA" = "High Social Anxiety")) +
+    labs(title = "Group × Interpretation Type Interaction",
+         subtitle = "Error bars show ±1 SE (Key finding from Beard & Amir, 2009)",
+         x = "Interpretation Type",
+         y = "Endorsement Rate",
+         color = "Group",
+         shape = "Group") +
+    ylim(0, 1) +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "bottom",
+          legend.title = element_text(face = "bold", size = 12),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(face = "bold", size = 16),
+          axis.title = element_text(face = "bold"))
+  
+  # Plot 2: Bar plot showing bias scores by group
+  bias_by_group <- subject_scores_grouped %>%
+    group_by(group) %>%
+    summarise(
+      mean_bias = mean(endorsement_bias, na.rm = TRUE),
+      se_bias = sd(endorsement_bias, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+  
+  p_bias_group <- ggplot(bias_by_group, aes(x = group, y = mean_bias, fill = group)) +
+    geom_bar(stat = "identity", width = 0.6, color = "black", alpha = 0.7) +
+    geom_errorbar(aes(ymin = mean_bias - se_bias, ymax = mean_bias + se_bias), 
+                  width = 0.2, size = 1) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 1) +
+    geom_text(aes(label = sprintf("%.3f", mean_bias)), 
+              vjust = ifelse(bias_by_group$mean_bias > 0, -1.5, 2),
+              size = 5, fontface = "bold") +
+    scale_fill_manual(values = c("LSA" = "#2ca02c", "HSA" = "#d62728")) +
+    scale_x_discrete(labels = c("LSA" = "Low Social\nAnxiety", "HSA" = "High Social\nAnxiety")) +
+    labs(title = "Endorsement Bias by Group",
+         subtitle = "Negative - Benign",
+         x = "Group",
+         y = "Endorsement Bias Score") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "none",
+          plot.title = element_text(face = "bold", size = 16),
+          axis.title = element_text(face = "bold"))
+  
+  # Combine plots
+  ggarrange(p_interaction, p_bias_group, ncol = 2, widths = c(1.2, 1), labels = c("A", "B"))
+  
+} else {
+  cat("Group × Interpretation interaction plot requires HSA/LSA group assignments\n")
+}
+```
+
+---
+
+# Summary of Results
+
+## Key Findings Table
+
+```{r summary-table}
+# Create summary results table
+summary_results <- tibble(
+  Measure = c("Negative Endorsement", "Benign Endorsement", "Endorsement Bias",
+              "Negative RT (endorsed)", "Benign RT (endorsed)", "RT Bias"),
+  Mean = c(
+    mean(subject_scores$negative_endorsement, na.rm = TRUE),
+    mean(subject_scores$benign_endorsement, na.rm = TRUE),
+    mean(subject_scores$endorsement_bias, na.rm = TRUE),
+    mean(subject_scores$negative_rt, na.rm = TRUE),
+    mean(subject_scores$benign_rt, na.rm = TRUE),
+    mean(subject_scores$rt_bias, na.rm = TRUE)
+  ),
+  SD = c(
+    sd(subject_scores$negative_endorsement, na.rm = TRUE),
+    sd(subject_scores$benign_endorsement, na.rm = TRUE),
+    sd(subject_scores$endorsement_bias, na.rm = TRUE),
+    sd(subject_scores$negative_rt, na.rm = TRUE),
+    sd(subject_scores$benign_rt, na.rm = TRUE),
+    sd(subject_scores$rt_bias, na.rm = TRUE)
+  ),
+  Min = c(
+    min(subject_scores$negative_endorsement, na.rm = TRUE),
+    min(subject_scores$benign_endorsement, na.rm = TRUE),
+    min(subject_scores$endorsement_bias, na.rm = TRUE),
+    min(subject_scores$negative_rt, na.rm = TRUE),
+    min(subject_scores$benign_rt, na.rm = TRUE),
+    min(subject_scores$rt_bias, na.rm = TRUE)
+  ),
+  Max = c(
+    max(subject_scores$negative_endorsement, na.rm = TRUE),
+    max(subject_scores$benign_endorsement, na.rm = TRUE),
+    max(subject_scores$endorsement_bias, na.rm = TRUE),
+    max(subject_scores$negative_rt, na.rm = TRUE),
+    max(subject_scores$benign_rt, na.rm = TRUE),
+    max(subject_scores$rt_bias, na.rm = TRUE)
+  )
+)
+
+kable(summary_results, digits = 3, caption = "Summary of All Measures") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Interpretation
+
+**Sample:** N = `r nrow(subject_scores)` participants
+
+**Main Findings:**
+
+1. **Endorsement Bias:** `r if(exists("endorsement_test")) { if(endorsement_test$p.value < 0.05) paste0("Participants showed **significant** interpretation bias (p = ", format.pval(endorsement_test$p.value, digits = 3), ", d = ", round(cohens_d_endorse, 2), "), endorsing negative interpretations ", ifelse(mean(subject_scores$negative_endorsement) > mean(subject_scores$benign_endorsement), "MORE", "LESS"), " than benign interpretations.") else "No significant difference in endorsement between negative and benign interpretations." } else "Analysis pending."`
+
+2. **Response Time:** `r if(exists("rt_test") && nrow(rt_complete) > 1) { if(rt_test$p.value < 0.05) paste0("**Significant** RT difference (p = ", format.pval(rt_test$p.value, digits = 3), ", d = ", round(cohens_d_rt, 2), "). Negative interpretations were endorsed ", ifelse(mean(rt_complete$negative_rt) < mean(rt_complete$benign_rt), "FASTER", "SLOWER"), " than benign.") else "No significant RT difference." } else "Insufficient data for RT analysis."`
+
+3. **Clinical Significance:** Effect sizes are interpreted using Cohen's guidelines: d = 0.2 (small), 0.5 (medium), 0.8 (large).
+
+---
+
+# Save Results
+
+```{r save-results}
+# Save subject scores to CSV
+write_csv(subject_scores, file.path(OUTPUT_DIR, "wsap_subject_scores.csv"))
+cat(" Saved subject scores to: wsap_subject_scores.csv\n")
+
+# Save trial-level data
+write_csv(df, file.path(OUTPUT_DIR, "wsap_cleaned_data.csv"))
+cat(" Saved cleaned trial data to: wsap_cleaned_data.csv\n")
+
+# Save domain-specific scores
+write_csv(domain_scores, file.path(OUTPUT_DIR, "wsap_domain_scores.csv"))
+cat(" Saved domain-specific scores to: wsap_domain_scores.csv\n")
+```
+
+---
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```
+
+---
+
+# References
+
+Beard, C., & Amir, N. (2009). Interpretation in social anxiety: When meaning precedes ambiguity. *Cognitive Therapy and Research, 33*(4), 406-415. https://doi.org/10.1007/s10608-009-9235-0
+
+Amir, N., Beard, C., & Bower, E. (2005). Interpretation bias and social anxiety. *Cognitive Therapy and Research, 29*(4), 433-443.
+
+---

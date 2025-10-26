@@ -4,6 +4,8 @@
     <title>Word Sentence Association Paradigm</title>
     <script src="https://unpkg.com/jspsych@8.2.2"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@2.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@2.0.0"></script>
     <script src="https://unpkg.com/papaparse@5.3.0/papaparse.min.js"></script>
     <link
       href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css"
@@ -24,13 +26,22 @@
     // Initialize jsPsych
     var jsPsych = initJsPsych({
       on_finish: function () {
-        var wsap_data = jsPsych.data.get().filter({ task: "wsap" });
+        // Get all data and convert to CSV
+        var csv_data = jsPsych.data.get().csv();
+
+        // Clear the display
         document.body.innerHTML =
           '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">Saving your data...</div>';
 
+        // Generate filename
+        var filename = "wsap_" + subject_id;
+
         // Send to server
         var xhr = new XMLHttpRequest();
-        xhr.open("POST", "write_data.php");
+        xhr.open(
+          "POST",
+          "https://web.stanford.edu/~emartz/cgi-bin/save_data.php"
+        );
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onload = function () {
           if (xhr.status == 200) {
@@ -38,14 +49,21 @@
               '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">Thank you! Your data has been saved.<br><br>You may now close this window.</div>';
           } else {
             document.body.innerHTML =
-              '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">There was an error saving your data.<br><br>Please contact the researcher.</div>';
+              '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">There was an error saving your data.<br><br>Please contact the researcher.<br><br>Error: ' +
+              xhr.status +
+              "</div>";
           }
         };
         xhr.onerror = function () {
           document.body.innerHTML =
             '<div style="color: black; font-size: 20px; padding: 50px; text-align: center;">There was an error saving your data.<br><br>Please contact the researcher.</div>';
         };
-        xhr.send(JSON.stringify({ filedata: wsap_data.csv() }));
+        xhr.send(
+          JSON.stringify({
+            filedata: csv_data,
+            filename: filename,
+          })
+        );
       },
     });
 
@@ -86,41 +104,574 @@
       var welcome = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: `
-              <div style="color: black; font-size: 18px;">
-                <p>Welcome to the experiment.</p>
-                <p>Press any key to continue.</p>
-              </div>
-            `,
+          <div style="color: black; font-size: 18px;">
+            <p>Welcome to the experiment.</p>
+            <p>Press any key to continue.</p>
+          </div>
+        `,
       };
       timeline.push(welcome);
 
-      // Instructions
+      // ===== SPIN (Social Phobia Inventory) =====
+      var spin_items = [
+        "I am afraid of people in authority",
+        "I am bothered by blushing in front of people",
+        "Parties and social events scare me",
+        "I avoid talking to people I don't know",
+        "Being criticized scares me a lot",
+        "I avoid doing things or speaking to people for fear of embarrassment",
+        "Sweating in front of people causes me distress",
+        "I avoid going to parties",
+        "I avoid activities in which I am the center of attention",
+        "Talking to strangers scares me",
+        "I avoid having to give speeches",
+        "I would do anything to avoid being criticized",
+        "Heart palpitations bother me when I am around people",
+        "I am afraid of doing things when people might be watching",
+        "Being embarrassed or looking stupid are among my worst fears",
+        "I avoid speaking to anyone in authority",
+        "Trembling or shaking in front of others is distressing to me",
+      ];
+
+      var spin_scale = [
+        "Not at all",
+        "A little bit",
+        "Somewhat",
+        "Very much",
+        "Extremely",
+      ];
+
+      var spin_questions = spin_items.map(function (item, index) {
+        return {
+          prompt: index + 1 + ". " + item,
+          name: "spin_" + (index + 1),
+          labels: spin_scale,
+          required: true,
+        };
+      });
+
+      var spin_trial = {
+        type: jsPsychSurveyLikert,
+        preamble: `
+          <div style="color: black; font-size: 16px; max-width: 700px; margin: 0 auto;">
+            <p><strong>Social Phobia Inventory (SPIN)</strong></p>
+            <p>Please read each statement and select the response that indicates how much the statement applied to you over the <strong>past week</strong>.</p>
+          </div>
+        `,
+        questions: spin_questions,
+        data: {
+          task: "spin",
+          measure: "social_anxiety",
+        },
+        on_finish: function (data) {
+          // Flatten individual responses into separate columns
+          var responses = data.response;
+          var total = 0;
+
+          for (var key in responses) {
+            data[key] = responses[key]; // Add each item as separate column
+            total += responses[key];
+          }
+
+          data.spin_total = total;
+
+          // Remove the nested response object to avoid CSV formatting issues
+          delete data.response;
+        },
+      };
+
+      // ===== STAI STATE (Form Y-1) =====
+      var stai_state_items = [
+        "I feel calm",
+        "I feel secure",
+        "I am tense",
+        "I feel strained",
+        "I feel at ease",
+        "I feel upset",
+        "I am presently worrying over possible misfortunes",
+        "I feel satisfied",
+        "I feel frightened",
+        "I feel comfortable",
+        "I feel self-confident",
+        "I feel nervous",
+        "I am jittery",
+        "I feel indecisive",
+        "I am relaxed",
+        "I feel content",
+        "I am worried",
+        "I feel confused",
+        "I feel steady",
+        "I feel pleasant",
+      ];
+
+      var stai_state_scale = [
+        "Not at all",
+        "Somewhat",
+        "Moderately so",
+        "Very much so",
+      ];
+
+      var stai_state_questions = stai_state_items.map(function (item, index) {
+        return {
+          prompt: index + 1 + ". " + item,
+          name: "stai_state_" + (index + 1),
+          labels: stai_state_scale,
+          required: true,
+        };
+      });
+
+      var stai_state_trial = {
+        type: jsPsychSurveyLikert,
+        preamble: `
+          <div style="color: black; font-size: 16px; max-width: 800px; margin: 0 auto; text-align: left;">
+            <p><strong>SELF-EVALUATION QUESTIONNAIRE</strong></p>
+            <p><strong>STAI Form Y-1</strong></p>
+            <br>
+            <p>A number of statements which people have used to describe themselves are given below. 
+            Read each statement and then select the appropriate response to indicate how you feel 
+            <strong>right now, that is, at this moment</strong>. There are no right or wrong answers. 
+            Do not spend too much time on any one statement but give the answer which seems to 
+            describe your present feelings best.</p>
+          </div>
+        `,
+        questions: stai_state_questions,
+        data: {
+          task: "stai_state",
+          measure: "state_anxiety",
+        },
+        on_finish: function (data) {
+          // Items to reverse score: 1, 2, 5, 8, 10, 11, 15, 16, 19, 20
+          var reverse_items = [1, 2, 5, 8, 10, 11, 15, 16, 19, 20];
+          var responses = data.response;
+          var total = 0;
+
+          for (var key in responses) {
+            var item_num = parseInt(key.split("_")[2]);
+            var score = responses[key];
+
+            // Store raw response
+            data[key] = score;
+
+            // Reverse score if needed (convert 0,1,2,3 to 3,2,1,0)
+            if (reverse_items.indexOf(item_num) !== -1) {
+              score = 3 - score;
+            }
+
+            total += score;
+          }
+
+          // Add 20 to get final score (range 20-80)
+          data.stai_state_total = total + 20;
+
+          // Remove the nested response object
+          delete data.response;
+        },
+      };
+
+      // ===== STAI TRAIT (Form Y-2) =====
+      var stai_trait_items = [
+        "I feel pleasant",
+        "I feel nervous and restless",
+        "I feel satisfied with myself",
+        "I wish I could be as happy as others seem to be",
+        "I feel like a failure",
+        "I feel rested",
+        'I am "calm, cool, and collected"',
+        "I feel that difficulties are piling up so that I cannot overcome them",
+        "I worry too much over something that really doesn't matter",
+        "I am happy",
+        "I have disturbing thoughts",
+        "I lack self-confidence",
+        "I feel secure",
+        "I make decisions easily",
+        "I feel inadequate",
+        "I am content",
+        "Some unimportant thought runs through my mind and bothers me",
+        "I take disappointments so keenly that I can't put them out of my mind",
+        "I am a steady person",
+        "I get in a state of tension or turmoil as I think over my recent concerns and interests",
+      ];
+
+      var stai_trait_scale = [
+        "Almost never",
+        "Sometimes",
+        "Often",
+        "Almost always",
+      ];
+
+      var stai_trait_questions = stai_trait_items.map(function (item, index) {
+        return {
+          prompt: index + 21 + ". " + item,
+          name: "stai_trait_" + (index + 21),
+          labels: stai_trait_scale,
+          required: true,
+        };
+      });
+
+      var stai_trait_trial = {
+        type: jsPsychSurveyLikert,
+        preamble: `
+          <div style="color: black; font-size: 16px; max-width: 800px; margin: 0 auto; text-align: left;">
+            <p><strong>SELF-EVALUATION QUESTIONNAIRE</strong></p>
+            <p><strong>STAI Form Y-2</strong></p>
+            <br>
+            <p>A number of statements which people have used to describe themselves are given below. 
+            Read each statement and then select the appropriate response to indicate 
+            <strong>how you generally feel</strong>. There are no right or wrong answers. 
+            Do not spend too much time on any one statement but give the answer which seems to 
+            describe how you generally feel.</p>
+          </div>
+        `,
+        questions: stai_trait_questions,
+        data: {
+          task: "stai_trait",
+          measure: "trait_anxiety",
+        },
+        on_finish: function (data) {
+          // Items to reverse score: 21, 23, 26, 27, 30, 33, 34, 36, 39
+          var reverse_items = [21, 23, 26, 27, 30, 33, 34, 36, 39];
+          var responses = data.response;
+          var total = 0;
+
+          for (var key in responses) {
+            var item_num = parseInt(key.split("_")[2]);
+            var score = responses[key];
+
+            // Store raw response
+            data[key] = score;
+
+            // Reverse score if needed (convert 0,1,2,3 to 3,2,1,0)
+            if (reverse_items.indexOf(item_num) !== -1) {
+              score = 3 - score;
+            }
+
+            total += score;
+          }
+
+          // Add 20 to get final score (range 20-80)
+          data.stai_trait_total = total + 20;
+
+          // Remove the nested response object
+          delete data.response;
+        },
+      };
+
+      // ===== BDI (Beck Depression Inventory) =====
+      var bdi_trial = {
+        type: jsPsychSurveyMultiChoice,
+        preamble: `
+          <div style="color: black; font-size: 16px; max-width: 700px; margin: 0 auto;">
+            <p><strong>Beck Depression Inventory</strong></p>
+            <p>This questionnaire consists of 21 groups of statements. Please read each group of statements carefully 
+            and then pick out the one statement in each group that best describes the way you have been feeling during 
+            the <strong>past week, including today</strong>.</p>
+          </div>
+        `,
+        questions: [
+          {
+            prompt: "1.",
+            name: "bdi_1",
+            options: [
+              "I do not feel sad",
+              "I feel sad",
+              "I am sad all the time and I can't snap out of it",
+              "I am so sad and unhappy that I can't stand it",
+            ],
+            required: true,
+          },
+          {
+            prompt: "2.",
+            name: "bdi_2",
+            options: [
+              "I am not particularly discouraged about the future",
+              "I feel discouraged about the future",
+              "I feel I have nothing to look forward to",
+              "I feel the future is hopeless and that things cannot improve",
+            ],
+            required: true,
+          },
+          {
+            prompt: "3.",
+            name: "bdi_3",
+            options: [
+              "I do not feel like a failure",
+              "I feel I have failed more than the average person",
+              "As I look back on my life, all I can see is a lot of failures",
+              "I feel I am a complete failure as a person",
+            ],
+            required: true,
+          },
+          {
+            prompt: "4.",
+            name: "bdi_4",
+            options: [
+              "I get as much satisfaction out of things as I used to",
+              "I don't enjoy things the way I used to",
+              "I don't get real satisfaction out of anything anymore",
+              "I am dissatisfied or bored with everything",
+            ],
+            required: true,
+          },
+          {
+            prompt: "5.",
+            name: "bdi_5",
+            options: [
+              "I don't feel particularly guilty",
+              "I feel guilty a good part of the time",
+              "I feel quite guilty most of the time",
+              "I feel guilty all of the time",
+            ],
+            required: true,
+          },
+          {
+            prompt: "6.",
+            name: "bdi_6",
+            options: [
+              "I don't feel I am being punished",
+              "I feel I may be punished",
+              "I expect to be punished",
+              "I feel I am being punished",
+            ],
+            required: true,
+          },
+          {
+            prompt: "7.",
+            name: "bdi_7",
+            options: [
+              "I don't feel disappointed in myself",
+              "I am disappointed in myself",
+              "I am disgusted with myself",
+              "I hate myself",
+            ],
+            required: true,
+          },
+          {
+            prompt: "8.",
+            name: "bdi_8",
+            options: [
+              "I don't feel I am any worse than anybody else",
+              "I am critical of myself for my weaknesses or mistakes",
+              "I blame myself all the time for my faults",
+              "I blame myself for everything bad that happens",
+            ],
+            required: true,
+          },
+          {
+            prompt: "9.",
+            name: "bdi_9",
+            options: [
+              "I don't have any thoughts of killing myself",
+              "I have thoughts of killing myself, but I would not carry them out",
+              "I would like to kill myself",
+              "I would kill myself if I had the chance",
+            ],
+            required: true,
+          },
+          {
+            prompt: "10.",
+            name: "bdi_10",
+            options: [
+              "I don't cry any more than usual",
+              "I cry more now than I used to",
+              "I cry all the time now",
+              "I used to be able to cry, but now I can't cry even though I want to",
+            ],
+            required: true,
+          },
+          {
+            prompt: "11.",
+            name: "bdi_11",
+            options: [
+              "I am no more irritated by things than I ever was",
+              "I am slightly more irritated now than usual",
+              "I am quite annoyed or irritated a good deal of the time",
+              "I feel irritated all the time",
+            ],
+            required: true,
+          },
+          {
+            prompt: "12.",
+            name: "bdi_12",
+            options: [
+              "I have not lost interest in other people",
+              "I am less interested in other people than I used to be",
+              "I have lost most of my interest in other people",
+              "I have lost all of my interest in other people",
+            ],
+            required: true,
+          },
+          {
+            prompt: "13.",
+            name: "bdi_13",
+            options: [
+              "I make decisions about as well as I ever could",
+              "I put off making decisions more than I used to",
+              "I have greater difficulty in making decisions more than I used to",
+              "I can't make decisions at all anymore",
+            ],
+            required: true,
+          },
+          {
+            prompt: "14.",
+            name: "bdi_14",
+            options: [
+              "I don't feel that I look any worse than I used to",
+              "I am worried that I am looking old or unattractive",
+              "I feel there are permanent changes in my appearance that make me look unattractive",
+              "I believe that I look ugly",
+            ],
+            required: true,
+          },
+          {
+            prompt: "15.",
+            name: "bdi_15",
+            options: [
+              "I can work about as well as before",
+              "It takes an extra effort to get started at doing something",
+              "I have to push myself very hard to do anything",
+              "I can't do any work at all",
+            ],
+            required: true,
+          },
+          {
+            prompt: "16.",
+            name: "bdi_16",
+            options: [
+              "I can sleep as well as usual",
+              "I don't sleep as well as I used to",
+              "I wake up 1-2 hours earlier than usual and find it hard to get back to sleep",
+              "I wake up several hours earlier than I used to and cannot get back to sleep",
+            ],
+            required: true,
+          },
+          {
+            prompt: "17.",
+            name: "bdi_17",
+            options: [
+              "I don't get more tired than usual",
+              "I get tired more easily than I used to",
+              "I get tired from doing almost anything",
+              "I am too tired to do anything",
+            ],
+            required: true,
+          },
+          {
+            prompt: "18.",
+            name: "bdi_18",
+            options: [
+              "My appetite is no worse than usual",
+              "My appetite is not as good as it used to be",
+              "My appetite is much worse now",
+              "I have no appetite at all anymore",
+            ],
+            required: true,
+          },
+          {
+            prompt: "19.",
+            name: "bdi_19",
+            options: [
+              "I haven't lost much weight, if any, lately",
+              "I have lost more than five pounds",
+              "I have lost more than ten pounds",
+              "I have lost more than fifteen pounds",
+            ],
+            required: true,
+          },
+          {
+            prompt: "20.",
+            name: "bdi_20",
+            options: [
+              "I am no more worried about my health than usual",
+              "I am worried about physical problems like aches, pains, upset stomach, or constipation",
+              "I am very worried about physical problems and it's hard to think of much else",
+              "I am so worried about my physical problems that I cannot think of anything else",
+            ],
+            required: true,
+          },
+          {
+            prompt: "21.",
+            name: "bdi_21",
+            options: [
+              "I have not noticed any recent change in my interest in sex",
+              "I am less interested in sex than I used to be",
+              "I have almost no interest in sex",
+              "I have lost interest in sex completely",
+            ],
+            required: true,
+          },
+        ],
+        data: {
+          task: "bdi",
+          measure: "depression",
+        },
+        on_finish: function (data) {
+          // Flatten individual responses into separate columns
+          var responses = data.response;
+          var total = 0;
+
+          for (var key in responses) {
+            data[key] = responses[key]; // Add each item as separate column
+            total += responses[key];
+          }
+
+          data.bdi_total = total;
+
+          // Add interpretation level
+          if (total <= 10) {
+            data.bdi_level = "normal";
+          } else if (total <= 16) {
+            data.bdi_level = "mild_mood_disturbance";
+          } else if (total <= 20) {
+            data.bdi_level = "borderline_clinical";
+          } else if (total <= 30) {
+            data.bdi_level = "moderate_depression";
+          } else if (total <= 40) {
+            data.bdi_level = "severe_depression";
+          } else {
+            data.bdi_level = "extreme_depression";
+          }
+
+          // Remove the nested response object
+          delete data.response;
+        },
+      };
+
+      // Instructions for WSAP task
       var instructions = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: `
-    <div style="color: black; font-size: 16px; max-width: 700px; margin: 0 auto; text-align: center;">
-      <p>In this task, you will see a word followed by a sentence.</p>
-      <p>Your job is to decide whether the word and sentence are related.</p>
-      <br>
-      <p><strong>Here's what will happen on each trial:</strong></p>
-      <ol style="text-align: left; display: inline-block; margin: 0 auto;">
-        <li>A fixation cross (+) will appear briefly</li>
-        <li>A word will appear briefly</li>
-        <li>A sentence will appear - press the SPACEBAR when you finish reading it</li>
-        <li>You'll be asked if the word and sentence are related</li>
-      </ol>
-      <br><br>
-      <p><strong>To respond:</strong></p>
-      <p>Press <strong>1</strong> on the number pad if they ARE related</p>
-      <p>Press <strong>3</strong> on the number pad if they ARE NOT related</p>
-      <br>
-      <p>Press any key to begin.</p>
-    </div>
-  `,
+          <div style="color: black; font-size: 16px; max-width: 700px; margin: 0 auto; text-align: center;">
+            <p>In this task, you will see a word followed by a sentence.</p>
+            <p>Your job is to decide whether the word and sentence are related.</p>
+            <br>
+            <p><strong>Here's what will happen on each trial:</strong></p>
+            <ol style="text-align: left; display: inline-block; margin: 0 auto;">
+              <li>A fixation cross (+) will appear briefly</li>
+              <li>A word will appear briefly</li>
+              <li>A sentence will appear - press the SPACEBAR when you finish reading it</li>
+              <li>You'll be asked if the word and sentence are related</li>
+            </ol>
+            <br><br>
+            <p><strong>To respond:</strong></p>
+            <p>Press <strong>1</strong> on the number pad if they ARE related</p>
+            <p>Press <strong>3</strong> on the number pad if they ARE NOT related</p>
+            <br>
+            <p>Press any key to begin.</p>
+          </div>
+        `,
         post_trial_gap: 500,
       };
+
+      // Add all trials to timeline in correct order
+      timeline.push(spin_trial);
+      timeline.push(stai_state_trial);
+      timeline.push(stai_trait_trial);
+      timeline.push(bdi_trial);
       timeline.push(instructions);
+
+      // WSAP trials
       var randomized_stimuli = jsPsych.randomization.shuffle(set_stimuli);
+      // .slice(0, 3);
 
       // 1. Fixation cross (500ms)
       var fixation = {
@@ -158,17 +709,16 @@
         post_trial_gap: 0,
       };
 
-      // 4. Relatedness judgment
       var judgment = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: `
-              <div style="font-size: 12pt; color: black;">
-                <p>Were the word and sentence related?</p>
-                <br>
-                <p>Press <strong>1</strong> for YES (related)</p>
-                <p>Press <strong>3</strong> for NO (not related)</p>
-              </div>
-            `,
+          <div style="font-size: 12pt; color: black;">
+            <p>Were the word and sentence related?</p>
+            <br>
+            <p>Press <strong>1</strong> for YES (related)</p>
+            <p>Press <strong>3</strong> for NO (not related)</p>
+          </div>
+        `,
         choices: ["1", "3"],
         data: {
           task: "wsap",
@@ -194,15 +744,16 @@
       var debrief = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: `
-              <div style="color: black; font-size: 18px;">
-                <p>Thank you for participating!</p>
-                <p>You completed ${randomized_stimuli.length} trials.</p>
-                <br>
-                <p>Press any key to finish.</p>
-              </div>
-            `,
+          <div style="color: black; font-size: 18px;">
+            <p>Thank you for participating!</p>
+            <p>You completed ${randomized_stimuli.length} trials.</p>
+            <br>
+            <p>Press any key to finish.</p>
+          </div>
+        `,
       };
       timeline.push(debrief);
+
       jsPsych.run(timeline);
     }
   </script>
