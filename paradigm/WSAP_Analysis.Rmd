@@ -452,6 +452,8 @@ ggplot(subject_scores, aes(x = reorder(subject, SPIN), y = endorsement_bias, fil
 ## Figure 3: Group × Interpretation Interaction
 
 ```{r fig-interaction, fig.width=10, fig.height=6}
+
+# Figure 3: Group × Interpretation Interaction (Save Separately)
 if (nrow(subject_scores_grouped) >= 2) {
   
   # Calculate means and SEs for plotting
@@ -485,6 +487,19 @@ if (nrow(subject_scores_grouped) >= 2) {
           plot.title = element_text(face = "bold", size = 16),
           axis.title = element_text(face = "bold"))
   
+  # Save interaction plot
+  ggsave(filename = file.path(OUTPUT_DIR, "interaction_plot.png"),
+         plot = p_interaction,
+         width = 8,
+         height = 6,
+         dpi = 300,
+         bg = "white")
+  
+  cat("Saved: interaction_plot.png\n")
+  
+  # Display in notebook
+  print(p_interaction)
+  
   # Bar plot showing bias by group
   bias_by_group <- subject_scores_grouped %>%
     group_by(group) %>%
@@ -512,9 +527,126 @@ if (nrow(subject_scores_grouped) >= 2) {
           plot.title = element_text(face = "bold", size = 16),
           axis.title = element_text(face = "bold"))
   
-  # Combine plots
-  ggarrange(p_interaction, p_bias_group, ncol = 2, widths = c(1.2, 1))
+  # Save bias plot
+  ggsave(filename = file.path(OUTPUT_DIR, "bias_by_group_plot.png"),
+         plot = p_bias_group,
+         width = 6,
+         height = 6,
+         dpi = 300,
+         bg = "white")
+  
+  cat("Saved: bias_by_group_plot.png\n")
+  
+  # Display in notebook
+  print(p_bias_group)
+  
+  # OPTIONAL: Save combined plot as well
+  p_combined <- ggarrange(p_interaction, p_bias_group, ncol = 2, widths = c(1.2, 1))
+  
+  ggsave(filename = file.path(OUTPUT_DIR, "combined_interaction_plot.png"),
+         plot = p_combined,
+         width = 12,
+         height = 6,
+         dpi = 300,
+         bg = "white")
+  
+  cat("Saved: combined_interaction_plot.png\n")
+  
+  # Display combined plot in notebook
+  print(p_combined)
 }
+```
+
+# T-Tests
+```{r}
+# Simple effects: Between-group comparisons for EACH interpretation type
+cat("\n=== SIMPLE EFFECTS: HSA vs LSA by Interpretation Type ===\n\n")
+
+hsa_negative <- subject_scores_grouped %>% filter(group == "HSA") %>% pull(negative_endorsement)
+lsa_negative <- subject_scores_grouped %>% filter(group == "LSA") %>% pull(negative_endorsement)
+hsa_benign <- subject_scores_grouped %>% filter(group == "HSA") %>% pull(benign_endorsement)
+lsa_benign <- subject_scores_grouped %>% filter(group == "LSA") %>% pull(benign_endorsement)
+
+neg_test <- t.test(hsa_negative, lsa_negative)
+ben_test <- t.test(hsa_benign, lsa_benign)
+
+cat("NEGATIVE Endorsement:\n")
+cat("  HSA: M =", round(mean(hsa_negative), 3), "\n")
+cat("  LSA: M =", round(mean(lsa_negative), 3), "\n")
+cat("  t =", round(neg_test$statistic, 3), ", p =", format.pval(neg_test$p.value, 3), "\n\n")
+
+cat("BENIGN Endorsement:\n")
+cat("  HSA: M =", round(mean(hsa_benign), 3), "\n")
+cat("  LSA: M =", round(mean(lsa_benign), 3), "\n")
+cat("  t =", round(ben_test$statistic, 3), ", p =", format.pval(ben_test$p.value, 3), "\n")
+```
+# SPIN Correlation
+```{r}
+# Scatterplot: SPIN vs Bias Score
+p_spin_corr <- ggplot(subject_scores, aes(x = SPIN, y = endorsement_bias, color = group)) +
+  geom_point(size = 4, alpha = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("HSA" = "#d62728", "LSA" = "#2ca02c", "Moderate" = "#ff7f0e")) +
+  labs(title = "Social Anxiety Predicts Interpretation Bias",
+       subtitle = "Higher SPIN scores → Greater negative bias",
+       x = "SPIN Score (Social Anxiety)",
+       y = "Endorsement Bias (Negative - Benign)",
+       color = "Group") +
+  theme_bw(base_size = 14) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(face = "bold", size = 16))
+
+ggsave("spin_correlation.png", p_spin_corr, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+# Test for Correlation
+```{r}
+# ===================================================================
+# KEY FINDING 3: Independence of Threat and Benign Interpretation Biases
+# ===================================================================
+
+cat("\n=== INDEPENDENCE OF BIASES (Beard & Amir Finding 3) ===\n\n")
+
+# Test 1: Correlation between Negative and Benign ENDORSEMENT
+endorsement_cor <- cor.test(subject_scores$negative_endorsement, 
+                            subject_scores$benign_endorsement,
+                            method = "pearson")
+
+cat("Endorsement Rates:\n")
+cat("  Negative × Benign correlation: r =", round(endorsement_cor$estimate, 3), "\n")
+cat("  p-value =", format.pval(endorsement_cor$p.value, 3), "\n")
+cat("  95% CI: [", round(endorsement_cor$conf.int[1], 3), ", ", 
+    round(endorsement_cor$conf.int[2], 3), "]\n", sep = "")
+cat("  Interpretation:", 
+    ifelse(endorsement_cor$p.value > 0.05, 
+           "NOT significantly correlated (independent constructs) ✓", 
+           "Significantly correlated"), "\n\n")
+
+# Paper's finding for comparison
+cat("  Paper's finding: r = -.25, p = .07 (not significant)\n\n")
+
+# Test 2: Correlation between Negative and Benign RT (if you have RT data)
+if (all(!is.na(subject_scores$negative_rt)) && all(!is.na(subject_scores$benign_rt))) {
+  rt_cor <- cor.test(subject_scores$negative_rt, 
+                    subject_scores$benign_rt,
+                    method = "pearson")
+  
+  cat("Reaction Times:\n")
+  cat("  Negative RT × Benign RT correlation: r =", round(rt_cor$estimate, 3), "\n")
+  cat("  p-value =", format.pval(rt_cor$p.value, 3), "\n")
+  cat("  Interpretation:", 
+      ifelse(rt_cor$p.value > 0.05, 
+             "NOT significantly correlated (independent) ✓", 
+             "Significantly correlated"), "\n\n")
+  
+  cat("  Paper's finding: r = .20, p = .16 (not significant)\n\n")
+}
+
+# Visual representation
+cat("Clinical Implication:\n")
+cat("  If biases are INDEPENDENT → Need to target BOTH in treatment\n")
+cat("  If biases are CORRELATED → Fixing one might fix the other\n\n")
 ```
 
 ---
