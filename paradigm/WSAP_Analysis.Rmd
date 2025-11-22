@@ -205,7 +205,6 @@ cat("\nCleaned WSAP trials:", nrow(wsap_clean), "\n")
 cat("RT outliers excluded:", n_excluded_rt, "(", pct_excluded_rt, "%)\n")
 cat("Valid subjects in analysis:", n_distinct(wsap_clean$subject), "\n")
 
-head(wsap_clean)
 ```
 
 ---
