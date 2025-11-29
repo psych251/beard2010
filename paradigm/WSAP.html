@@ -1030,8 +1030,8 @@
             </ol>
             <br><br>
             <p><strong>To respond:</strong></p>
-            <p>Press <strong>1</strong> on the number pad if they ARE related</p>
-            <p>Press <strong>3</strong> on the number pad if they ARE NOT related</p>
+            <p>Press the <strong>left arrow</strong> on the number pad if they ARE related</p>
+            <p>Press the <strong>right arrow</strong> on the number pad if they ARE NOT related</p>
             <br>
             <p>Press any key to begin.</p>
           </div>
@@ -1040,6 +1040,161 @@
       };
       timeline.push(instructions);
 
+      // === ATTENTION CHECK DEFINITIONS ===
+      // Attention check 1: Instruction check (disguised as regular trial)
+      var attention_check_1 = {
+        timeline: [
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: '<div style="font-size: 60px; color: black;">+</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus:
+              '<div style="font-size: 16px; color: black;">Continue</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+              <div style="font-size: 16px; color: black; max-width: 800px; margin: 0 auto;">
+                Please press the spacebar to continue with the task.
+              </div>
+              <div style="font-size: 11pt; color: #666; margin-top: 30px;">
+                Press the <strong>SPACEBAR</strong> when you have finished reading.
+              </div>
+            `,
+            choices: [" ", "arrowleft", "arrowright"],
+            data: {
+              task: "attention_check",
+              attention_check_number: 1,
+              attention_check_type: "instruction",
+              correct_response: " ",
+            },
+            on_finish: function (data) {
+              data.passed = data.response === " ";
+            },
+            post_trial_gap: 0,
+          },
+        ],
+      };
+
+      // Attention check 2: Comprehension (obvious word-sentence match)
+      var attention_check_2 = {
+        timeline: [
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: '<div style="font-size: 60px; color: black;">+</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: '<div style="font-size: 16px; color: black;">Sunny</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+              <div style="font-size: 16px; color: black; max-width: 800px; margin: 0 auto;">
+                The weather is bright and sunny today.
+              </div>
+              <div style="font-size: 11pt; color: #666; margin-top: 30px;">
+                Press the <strong>SPACEBAR</strong> when you have finished reading.
+              </div>
+            `,
+            choices: [" "],
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+              <div style="font-size: 16px; color: black;">
+                <p>Were the word and sentence related?</p>
+                <br>
+                <p>Press the <strong>left arrow</strong> for YES (related)</p>
+                <p>Press the <strong>right arrow</strong> for NO (not related)</p>
+              </div>
+            `,
+            choices: ["arrowleft", "arrowright"],
+            data: {
+              task: "attention_check",
+              attention_check_number: 2,
+              attention_check_type: "comprehension",
+              word: "Sunny",
+              sentence: "The weather is bright and sunny today.",
+              correct_response: "arrowleft",
+            },
+            on_finish: function (data) {
+              data.passed = data.response === "arrowleft";
+            },
+          },
+        ],
+      };
+
+      // Attention check 3: Another comprehension (obvious mismatch)
+      var attention_check_3 = {
+        timeline: [
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: '<div style="font-size: 60px; color: black;">+</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: '<div style="font-size: 16px; color: black;">Ocean</div>',
+            choices: "NO_KEYS",
+            trial_duration: 500,
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+              <div style="font-size: 16px; color: black; max-width: 800px; margin: 0 auto;">
+                The cat climbed up the tall tree.
+              </div>
+              <div style="font-size: 11pt; color: #666; margin-top: 30px;">
+                Press the <strong>SPACEBAR</strong> when you have finished reading.
+              </div>
+            `,
+            choices: [" "],
+            post_trial_gap: 0,
+          },
+          {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+              <div style="font-size: 16px; color: black;">
+                <p>Were the word and sentence related?</p>
+                <br>
+                <p>Press the <strong>left arrow</strong> for YES (related)</p>
+                <p>Press the <strong>right arrow</strong> for NO (not related)</p>
+              </div>
+            `,
+            choices: ["arrowleft", "arrowright"],
+            data: {
+              task: "attention_check",
+              attention_check_number: 3,
+              attention_check_type: "comprehension",
+              word: "Ocean",
+              sentence: "The cat climbed up the tall tree.",
+              correct_response: "arrowright",
+            },
+            on_finish: function (data) {
+              data.passed = data.response === "arrowright";
+            },
+          },
+        ],
+      };
       // WSAP trials - CHANGE THIS to shuffle(set_stimuli) for full experiment
       var randomized_stimuli = jsPsych.randomization.shuffle(set_stimuli);
 
@@ -1093,11 +1248,11 @@
           <div style="font-size: 16px; color: black;">
             <p>Were the word and sentence related?</p>
             <br>
-            <p>Press <strong>1</strong> for YES (related)</p>
-            <p>Press <strong>3</strong> for NO (not related)</p>
+            <p>Press the <strong>left arrow</strong> for YES (related)</p>
+            <p>Press the <strong>right arrow</strong> for NO (not related)</p>
           </div>
         `,
-        choices: ["1", "3"],
+        choices: ["arrowleft", "arrowright"],
         data: {
           task: "wsap",
           trial_part: "judgment",
@@ -1111,7 +1266,7 @@
           // Store response
           data.response_key = data.response;
           data.related_judgment =
-            data.response === "1" ? "related" : "not_related";
+            data.response === "arrowleft" ? "related" : "not_related";
           data.judgment_rt = data.rt;
 
           // Get trial type from timeline variable (it's already in data from above)
@@ -1120,7 +1275,7 @@
           // Determine if they endorsed the target interpretation
           if (trial_type === "Negative" || trial_type === "Positive") {
             // For interpretable trials, "related" response = endorsed the interpretation
-            data.endorsed_interpretation = data.response === "1";
+            data.endorsed_interpretation = data.response === "arrowleft";
           } else {
             // For foil trials, no interpretation to endorse
             data.endorsed_interpretation = null;
@@ -1128,11 +1283,55 @@
         },
       };
 
-      var trial_procedure = {
+      // var trial_procedure = {
+      //   timeline: [fixation, prime, sentence, judgment],
+      //   timeline_variables: randomized_stimuli,
+      // };
+      // timeline.push(trial_procedure);
+      // Split trials into chunks with attention checks interspersed
+      var trials_per_chunk = Math.floor(randomized_stimuli.length / 4); // Divide into 4 chunks
+
+      var chunk_1_stimuli = randomized_stimuli.slice(0, trials_per_chunk);
+      var chunk_2_stimuli = randomized_stimuli.slice(
+        trials_per_chunk,
+        trials_per_chunk * 2
+      );
+      var chunk_3_stimuli = randomized_stimuli.slice(
+        trials_per_chunk * 2,
+        trials_per_chunk * 3
+      );
+      var chunk_4_stimuli = randomized_stimuli.slice(trials_per_chunk * 3);
+
+      // Chunk 1
+      var trial_procedure_chunk1 = {
         timeline: [fixation, prime, sentence, judgment],
-        timeline_variables: randomized_stimuli,
+        timeline_variables: chunk_1_stimuli,
       };
-      timeline.push(trial_procedure);
+      timeline.push(trial_procedure_chunk1);
+      timeline.push(attention_check_1); // First attention check
+
+      // Chunk 2
+      var trial_procedure_chunk2 = {
+        timeline: [fixation, prime, sentence, judgment],
+        timeline_variables: chunk_2_stimuli,
+      };
+      timeline.push(trial_procedure_chunk2);
+      timeline.push(attention_check_2); // Second attention check
+
+      // Chunk 3
+      var trial_procedure_chunk3 = {
+        timeline: [fixation, prime, sentence, judgment],
+        timeline_variables: chunk_3_stimuli,
+      };
+      timeline.push(trial_procedure_chunk3);
+      timeline.push(attention_check_3); // Third attention check
+
+      // Chunk 4 (final chunk, no check after)
+      var trial_procedure_chunk4 = {
+        timeline: [fixation, prime, sentence, judgment],
+        timeline_variables: chunk_4_stimuli,
+      };
+      timeline.push(trial_procedure_chunk4);
 
       // Debrief
       var debrief = {
@@ -1161,6 +1360,23 @@
           data.total_time_ms = total_time_ms;
           data.total_time_seconds = total_time_seconds;
           data.total_time_minutes = total_time_minutes;
+
+          // Add attention check summary
+          var attention_data = jsPsych.data
+            .get()
+            .filter({ task: "attention_check" });
+          var attention_passed = attention_data
+            .filter({ passed: true })
+            .count();
+          var attention_total = attention_data.count();
+          var attention_rate =
+            attention_total > 0 ? attention_passed / attention_total : null;
+
+          jsPsych.data.addProperties({
+            attention_checks_passed: attention_passed,
+            attention_checks_total: attention_total,
+            attention_pass_rate: attention_rate,
+          });
 
           jsPsych.data.addProperties({
             total_time_ms: total_time_ms,
