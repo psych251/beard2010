@@ -24,6 +24,8 @@ The study procedure will begin by asking participants to complete three self-rep
 
 One potential challenge of replication will be that the author only shared five example sentences and prime words, but I intend to reach out to the author to request the full set of word-sentence pairs. Another will be coding the interface used to administer the experiment, since I have never built an experiment before (although I hope my other coding experience will help).
 
+Update: I was able to get in touch with the author to receive the original materials, that is, the words and sentences used in the paradigm. All trials now match exactly with the trials performed in the original experiment. 
+
 You can find the original paper here: https://pmc.ncbi.nlm.nih.gov/articles/PMC2792932/
 
 You can find my GitHub repository here: https://github.com/psych251/beard2010
