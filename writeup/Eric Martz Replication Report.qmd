@@ -39,17 +39,25 @@ You can find my GitHub repository here: https://github.com/psych251/beard2010
 <!-- Original effect size, power analysis for samples to achieve 80%, 90%, 95% power to detect that effect size. Considerations of feasibility for selecting planned sample size. -->
 
 In the original paper, the primary between-group comparisons showed large effects (Cohen's d = 0.75–0.94). The below table shows the key effect sizes for each comparison:
-```{r include=F}
+```{r}
 library(pwr)
+library(knitr)
+library(kableExtra)
+
 n_per_group <- 26
 total_analyzed <- 52
 total_recruited <- 86
 excluded <- 34
 
-cat("Sample Size:\n")
-cat("  Total recruited:", total_recruited, "\n")
-cat("  Excluded (middle 40% SPIN):", excluded, "\n")
-cat("  Final analyzed:", total_analyzed, "(", n_per_group, "per group)\n\n")
+# Sample size summary table
+sample_summary <- data.frame(
+  Description = c("Total recruited", 
+                  "Excluded (middle 40% SPIN)", 
+                  "Final analyzed",
+                  "Per group"),
+  N = c(total_recruited, excluded, total_analyzed, n_per_group)
+)
+
 
 # Original effect sizes from Beard & Amir (2009)
 effects <- data.frame(
@@ -73,15 +81,17 @@ effects$Power_achieved <- sapply(effects$Original_d, function(d) {
 
 effects$Power_pct <- paste0(round(effects$Power_achieved * 100, 1), "%")
 
-cat("Table: Statistical Power for Key Comparisons\n\n")
-print(knitr::kable(effects[, c("Effect", "Original_d", "Original_p", "Power_pct")],
-                   col.names = c("Effect", "Cohen's d", "Original p", "Power"),
-                   row.names = FALSE))
+kable(effects[, c("Effect", "Original_d", "Original_p", "Power_pct")],
+      caption = "Statistical Power for Key Comparisons",
+      col.names = c("Effect", "Cohen's d", "Original p", "Power"),
+      row.names = FALSE,
+      align = c("l", "c", "c", "c")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 
 In order to determine the 80%, 90%, and 95% power to detect these effect sizes, we compute the following: 
-```{r include=F}
+```{r}
 library(pwr)
 library(knitr)
 
@@ -130,7 +140,6 @@ While power for the benign bias effect (77%) falls slightly below the convention
 
 ### Planned Sample
 
-<!-- Planned sample size and/or termination rule, sampling frame, known demographics if any, preselection rules if any. -->
 
 I plan to recruit 86 participants to adhere to the methods reported in the paper which took the bottom 30% and top 30% of participants based on their score on the social anxiety scale. This would mean 26 participants in each group, with the middle 40% excluded. However, I expect the final sample size to be slightly smaller due to attrition from failed attention checks. Due to class budgetary restrictions, I cannot go above this number, so my analysis may be slightly more underpowered than the above estimates. 
 
@@ -157,8 +166,6 @@ Due to a lack of availability of the Social Phobia and Anxiety Inventory (STAI),
 
 ### Analysis Plan
 
-<!-- Can also quote directly, though it is less often spelled out effectively for an analysis strategy section. The key is to report an analysis strategy that is as close to the original - data cleaning rules, data exclusion rules, covariates, etc. - as possible. -->
-
 Following the original study, participants who scored in the middle 40% of social anxiety scores will be excluded. Reaction times will be excluded on a trial-by-trial basis if they fall below 50 ms or above 2000 ms. 
 
 In addition to these exclusions, I chose to add three attention checks to my trials. I will exclude participants who do not pass at least two of the three checks. Note that these were added after my Pilot B data was processed.
@@ -174,19 +181,12 @@ The key analyses I will conduct are
 
 ### Differences from Original Study
 
-<!-- Explicitly describe known differences in sample, setting, procedure, and analysis plan from original study. The goal, of course, is to minimize those differences, but differences will inevitably occur. Also, note whether such differences are anticipated to make a difference based on claims in the original article or subsequent published research on the conditions for obtaining the effect. -->
-
-The most significant deviation from the original study is the different social anxiety inventory used. Due to a lack of public access for the Social Phobia and Anxiety Inventory (STAI), I used the Social Phobia Inventory (SPIN) instead. Additionally, the experiment is conducted over Prolific rather than in person as in the original study. Attention checks were added during the WSAP task to exclude participants who failed 2 or more of the checks. As a result, the sample may be slightly smaller, since while the same sample was recruited, this likely will decrease in size once participants who failed the attention checks are excluded. Lastly, after my Pilot B was completed, I received guidance from the original author to change the response keys from 1 and 3 to the left and right arrows for ease of use. I do not expect any of these changes to significantly affect the outcome of the study, except for being more underpowered if the sample size is substantially smaller. 
-
-<!-- ### Methods Addendum (Post Data Collection) -->
-
-<!-- You can comment this section out prior to final report with data collection. -->
+The most significant deviation from the original study is the different social anxiety inventory used. Due to a lack of public access for the Social Phobia and Anxiety Inventory (STAI), I used the Social Phobia Inventory (SPIN) instead. Additionally, the experiment is conducted over Prolific rather than in person as in the original study. An attention check was added during the WSAP task to exclude participants were not paying attention. As a result, the sample may be slightly smaller, since while the same sample was recruited, this likely will decrease in size once participants who failed the attention checks are excluded. Lastly, after my Pilot B was completed, I received guidance from the original author to change the response keys from 1 and 3 to the left and right arrows for ease of use. I do not expect any of these changes to significantly affect the outcome of the study, except for being more underpowered if the sample size is substantially smaller. 
 
 #### Actual Sample
 
-<!-- Sample size, demographics, data exclusions based on rules spelled out in analysis plan -->
 
-The Pilot B study consisted of 6 participants, with 2 being assigned the lower SA group, 2 being assigned the higher SA group, and 2 being excluded. Of the four participants included, 50% were female, and ranged in age from 18-24 to 55-64 age groups. 
+The final sample consisted of 84 participants, 2 of whom were excluded for failing the attention check. 25 participants were assigned the social anxiety group, and 26 were assigned the non-anxious control group. 
 
 #### Differences from pre-data collection methods plan
 
@@ -198,7 +198,6 @@ After Pilot B, I decided to change the response keys from 1 and 3 to left and ri
 
 ### Data preparation
 
-Data preparation following the analysis plan.
 
 ```{r}
 ### Data Preparation
@@ -211,10 +210,10 @@ library(knitr)
 library(kableExtra)
 
 # Configuration Settings
-DATA_FOLDER <- "../../pilot_b_data" # Folder with participant CSV files, normally "../data/"
+DATA_FOLDER <- "../../full_sample" # Folder with participant CSV files, normally "../data/"
 WSAP_REFERENCE <- "../paradigm/WSAP.csv"        # Reference file with word-sentence pairs
 
-# RT CLEANING (per paper)
+# RT cleaning
 RT_MIN <- 50                        # Minimum RT in ms
 RT_MAX <- 2000                      # Maximum RT in ms
 
@@ -242,6 +241,7 @@ wsap_reference <- read_csv(WSAP_REFERENCE, show_col_types = FALSE) %>%
   ) %>%
   select(set, word, sentence, valence, sentence_type)
 
+
 # Load participant data
 csv_files <- list.files(DATA_FOLDER, pattern = "\\.csv$", full.names = TRUE)
 df_list <- lapply(csv_files, function(file) {
@@ -260,37 +260,51 @@ raw_data <- raw_data %>%
     across(c(spin_total, stai_state_total, stai_trait_total, 
              bdi_total, trial_index, time_elapsed), 
            ~suppressWarnings(as.numeric(.))),
-    across(c(word, sentence, domain, response_key, subject, trial_part), 
+    across(c(word, sentence, domain, response_key, response, subject, trial_part), 
            as.character)
   )
+  
 raw_data <- raw_data %>%
   group_by(subject) %>%
-  fill(age, gender, race_ethnicity, education, native_english, 
+  fill(age, gender, race_ethnicity, education, native_english,
+       spin_total, stai_state_total, stai_trait_total, bdi_total,
        .direction = "down") %>%
   ungroup()
+
 
 #### Data exclusion / filtering
 # Clean WSAP trials
 wsap_clean <- raw_data %>%
-  filter(task == "wsap") %>%  # Only judgment trials
+  filter(task == "wsap") %>%
   mutate(
-    word = str_trim(word),
-    sentence = str_trim(sentence),
-    # Extract judgment RT from rt column
+    word = str_trim(as.character(word)),
+    sentence = str_trim(as.character(sentence)),
     judgment_rt_clean = as.numeric(rt)
   ) %>%
   left_join(
-    wsap_reference %>% select(word, sentence, valence, sentence_type),
+    wsap_reference %>% 
+      mutate(
+        word = str_trim(word),
+        sentence = str_trim(sentence)
+      ) %>%
+      select(word, sentence, valence, sentence_type),
     by = c("word", "sentence")
   ) %>%
   mutate(
     response_type = case_when(
       response_key == "1" ~ "endorsement",
       response_key == "3" ~ "rejection",
+      tolower(as.character(response)) == "arrowleft" ~ "endorsement",
+      tolower(as.character(response)) == "arrowright" ~ "rejection",
       TRUE ~ NA_character_
     ),
-    endorsed = if_else(response_key == "1", 1, 0),
-    # Apply RT cleaning based on paper criteria
+    endorsed = case_when(
+      response_key == "1" ~ 1,
+      tolower(as.character(response)) == "arrowleft" ~ 1,
+      response_key == "3" ~ 0,
+      tolower(as.character(response)) == "arrowright" ~ 0,
+      TRUE ~ NA_real_
+    ),
     rt_clean = case_when(
       judgment_rt_clean >= RT_MIN & judgment_rt_clean <= RT_MAX ~ judgment_rt_clean,
       TRUE ~ NA_real_
@@ -302,6 +316,7 @@ wsap_clean <- raw_data %>%
          judgment_rt = judgment_rt_clean,
          rt_clean)
 
+
 # Exclude participants with incomplete data
 valid_subjects <- wsap_clean %>%
   group_by(subject) %>%
@@ -309,33 +324,7 @@ valid_subjects <- wsap_clean %>%
   filter(n_trials >= 50) %>%
   pull(subject)
 
-wsap_clean <- wsap_clean %>%
-  filter(subject %in% valid_subjects)
-
-# Attention check exclusions (not run for Pilot B, to be added)
-# attention_summary <- raw_data %>%
-#   filter(task == "attention_check") %>%
-#   group_by(subject) %>%
-#   summarise(
-#     attention_passed = sum(passed == TRUE, na.rm = TRUE),
-#     attention_total = n(),
-#     attention_rate = attention_passed / attention_total,
-#     .groups = "drop"
-#   )
-# 
-# failed_attention <- attention_summary %>%
-#   filter(attention_passed < 2) %>%
-#   pull(subject)
-# 
-# valid_subjects <- setdiff(valid_subjects, failed_attention)
-
-wsap_clean <- wsap_clean %>%
-  filter(subject %in% valid_subjects)
-
-#### Prepare data for analysis - create columns etc.
-# Extract participant-level info
-#### Prepare data for analysis - create columns etc.
-# Extract participant-level info
+# Extract participant-level info INCLUDING attention check data
 participant_info <- raw_data %>%
   group_by(subject) %>%
   summarise(
@@ -349,11 +338,26 @@ participant_info <- raw_data %>%
     race_ethnicity = first(na.omit(race_ethnicity)),
     education = first(na.omit(education)),
     native_english = first(na.omit(native_english)),
+    # Get attention check data from participant-level columns
+    attention_passed = first(na.omit(as.numeric(attention_checks_passed))),
+    attention_total = first(na.omit(as.numeric(attention_checks_total))),
     .groups = "drop"
   ) %>%
   filter(subject %in% valid_subjects)
 
-# Assign groups based on SPIN percentiles
+
+# Filter out participants who failed attention check
+failed_attention <- participant_info %>%
+  filter(attention_passed == 0) %>%
+  pull(subject)
+
+
+# Update participant_info and wsap_clean to only include valid subjects
+participant_info <- participant_info %>%
+  filter(subject %in% valid_subjects)
+
+wsap_clean <- wsap_clean %>%
+  filter(subject %in% valid_subjects)
   percentile_30 <- quantile(participant_info$spin_total, 0.30, na.rm = TRUE)
   percentile_70 <- quantile(participant_info$spin_total, 0.70, na.rm = TRUE)
   
@@ -365,7 +369,6 @@ participant_info <- raw_data %>%
         TRUE ~ "exclude"
       )
     )
-
 
 ### Sample Characteristics and Exclusions
 
@@ -454,7 +457,6 @@ demo_pct <- demo_summary %>%
   ) %>%
   select(-n)
 
-# Transpose for better display
 demo_table <- data.frame(
   Characteristic = c("Age: 18-24", "Age: 25-34", "Age: 35-44", "Age: 45-54", "Age: 55-64", "Age: 65+","Gender: Female", "Gender: Male", "Gender: Non-binary/Other", 
                      "Gender: Prefer not to say"),
@@ -492,7 +494,6 @@ kable(demo_table,
 
 ### Confirmatory analysis
 
-The analyses as specified in the analysis plan.
 ```{r}
 # Calculate endorsement rates
 endorsement_rates <- wsap_clean %>%
@@ -502,12 +503,12 @@ endorsement_rates <- wsap_clean %>%
     n_trials = n(),
     .groups = "drop"
   ) %>%
+  select(-n_trials) %>%  # REMOVE n_trials before pivoting!
   pivot_wider(
     names_from = c(sentence_type, valence),
     values_from = pct_endorsed,
     names_prefix = "pct_"
   )
-
 # Calculate reaction times
 rt_means <- wsap_clean %>%
   filter(!is.na(rt_clean)) %>%
@@ -546,6 +547,8 @@ participant_data <- participant_info %>%
 analysis_data <- participant_data %>%
   filter(group %in% c("SA", "NAC"))
 
+
+
 # Prepare long format for ANOVAs
 anova_data_long <- wsap_clean %>%
   left_join(participant_info %>% select(subject, group, spin_total), by = "subject") %>%
@@ -558,10 +561,27 @@ anova_data_long <- wsap_clean %>%
     valence = factor(valence, levels = c("benign", "threat")),
     response_type = factor(response_type, levels = c("endorsement", "rejection"))
   )
+
+completeness_check <- anova_data_long %>%
+  filter(!is.na(rt_clean)) %>%
+  group_by(subject, sentence_type, valence, response_type) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  complete(subject, sentence_type, valence, response_type, fill = list(n = 0))
+
+# Find participants with missing cells (0 trials in any condition)
+incomplete_subjects <- completeness_check %>%
+  filter(n == 0) %>%
+  pull(subject) %>%
+  unique()
+
+# Option 1: Exclude participants with incomplete data
+anova_data_complete <- anova_data_long %>%
+  filter(!subject %in% incomplete_subjects, !is.na(rt_clean))
+
 #### Primary Mixed ANOVA: Reaction Times
 # Group × Valence × Response Type × Sentence Type
 anova_rt <- ezANOVA(
-  data = anova_data_long %>% filter(!is.na(rt_clean)),
+  data = anova_data_complete,  # Use complete data
   dv = rt_clean,
   wid = subject,
   within = .(valence, response_type, sentence_type),
@@ -570,14 +590,9 @@ anova_rt <- ezANOVA(
   detailed = TRUE
 )
 
-# kable(anova_rt$ANOVA, 
-#       caption = "Mixed ANOVA: Reaction Times",
-#       digits = 3)
-
 #### Follow-up ANOVA: Social Sentences Only
-# Group × Valence × Response Type for social sentences
 anova_rt_social <- ezANOVA(
-  data = anova_data_long %>% filter(!is.na(rt_clean), sentence_type == "social"),
+  data = anova_data_complete %>% filter(sentence_type == "social"),
   dv = rt_clean,
   wid = subject,
   within = .(valence, response_type),
@@ -586,11 +601,7 @@ anova_rt_social <- ezANOVA(
   detailed = TRUE
 )
 
-# kable(anova_rt_social$ANOVA,
-#       caption = "Mixed ANOVA: Reaction Times (Social Sentences Only)",
-#       digits = 3)
-
-#### Independent t-tests: Bias Scores
+#### Independent t-tests: Bias Scores 
 # Threat bias
 threat_bias_test <- t.test(threat_bias_social ~ group, data = analysis_data)
 threat_bias_d <- cohensD(threat_bias_social ~ group, data = analysis_data)
@@ -731,21 +742,34 @@ combined_descriptives <- original_descriptives %>%
 
 kable(combined_descriptives,
       caption = "Table 1: Descriptive Statistics - Original vs Replication",
-      col.names = c("Measure", "Original SA\nM (SD)", "Original NAC\nM (SD)", 
-                    "Replication SA\nM (SD)", "Replication NAC\nM (SD)"),
+      col.names = c("Measure", "Original SA M (SD)", "Original NAC M (SD)", 
+                    "Replication SA M (SD)", "Replication NAC M (SD)"),
       align = c("l", "c", "c", "c", "c")) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
-  pack_rows("Self-Report Indices (%)", 1, 4) %>%
-  pack_rows("Reaction Time: Social Sentences (ms)", 5, 10) %>%
-  pack_rows("Reaction Time: Non-Social Sentences (ms)", 11, 14)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
-### Key Statistical Effects: Original vs Replication
+#### Independent tests: Endorsement Rates 
+# Threat endorsement: SA > NAC
+threat_endorse_aov <- aov(pct_social_threat ~ group, data = analysis_data)
+threat_endorse_summary <- summary(threat_endorse_aov)
+threat_endorse_f <- threat_endorse_summary[[1]]$`F value`[1]
+threat_endorse_df1 <- threat_endorse_summary[[1]]$Df[1]
+threat_endorse_df2 <- threat_endorse_summary[[1]]$Df[2]
+threat_endorse_p <- threat_endorse_summary[[1]]$`Pr(>F)`[1]
 
-# Run the key tests for replication
+# Benign endorsement: NAC > SA
+benign_endorse_aov <- aov(pct_social_benign ~ group, data = analysis_data)
+benign_endorse_summary <- summary(benign_endorse_aov)
+benign_endorse_f <- benign_endorse_summary[[1]]$`F value`[1]
+benign_endorse_df1 <- benign_endorse_summary[[1]]$Df[1]
+benign_endorse_df2 <- benign_endorse_summary[[1]]$Df[2]
+benign_endorse_p <- benign_endorse_summary[[1]]$`Pr(>F)`[1]
+
+#### Independent t-tests: Bias Scores (keep as t-tests like original)
+# Threat bias
 threat_bias_test <- t.test(threat_bias_social ~ group, data = analysis_data)
+
+# Benign bias
 benign_bias_test <- t.test(benign_bias_social ~ group, data = analysis_data)
-threat_endorse_test <- t.test(pct_social_threat ~ group, data = analysis_data)
-benign_endorse_test <- t.test(pct_social_benign ~ group, data = analysis_data)
 
 # SA within-group: threat vs benign endorsement
 sa_within <- t.test(analysis_data$pct_social_threat[analysis_data$group == "SA"],
@@ -757,15 +781,15 @@ nac_within <- t.test(analysis_data$pct_social_threat[analysis_data$group == "NAC
                      analysis_data$pct_social_benign[analysis_data$group == "NAC"],
                      paired = TRUE)
 
-# Create comparison table
+# Create comparison table with proper direction checking
 effects_comparison <- data.frame(
   Effect = c(
-    "Threat bias: SA > NAC",
-    "Benign bias: SA > NAC",
-    "Threat endorsement: SA > NAC",
-    "Benign endorsement: NAC > SA",
+    "Threat bias",
+    "Benign bias",
+    "Threat endorsement",
+    "Benign endorsement",
     "SA: Threat vs Benign endorsement",
-    "NAC: Benign > Threat endorsement"
+    "NAC: Benign vs Threat endorsement"
   ),
   Original_Statistic = c("t(50) = 2.98", "t(50) = 2.64", "F(1,50) = 34.26", 
                          "F(1,50) = 16.64", "t(25) = 1.39", "t(25) = -10.56"),
@@ -774,16 +798,16 @@ effects_comparison <- data.frame(
   Replication_Statistic = c(
     sprintf("t(%.0f) = %.2f", threat_bias_test$parameter, threat_bias_test$statistic),
     sprintf("t(%.0f) = %.2f", benign_bias_test$parameter, benign_bias_test$statistic),
-    sprintf("t(%.0f) = %.2f", threat_endorse_test$parameter, threat_endorse_test$statistic),
-    sprintf("t(%.0f) = %.2f", benign_endorse_test$parameter, benign_endorse_test$statistic),
+    sprintf("F(%d,%d) = %.2f", threat_endorse_df1, threat_endorse_df2, threat_endorse_f),
+    sprintf("F(%d,%d) = %.2f", benign_endorse_df1, benign_endorse_df2, benign_endorse_f),
     sprintf("t(%.0f) = %.2f", sa_within$parameter, sa_within$statistic),
     sprintf("t(%.0f) = %.2f", nac_within$parameter, nac_within$statistic)
   ),
   Replication_p = c(
     format.pval(threat_bias_test$p.value, digits = 3),
     format.pval(benign_bias_test$p.value, digits = 3),
-    format.pval(threat_endorse_test$p.value, digits = 3),
-    format.pval(benign_endorse_test$p.value, digits = 3),
+    format.pval(threat_endorse_p, digits = 3),
+    format.pval(benign_endorse_p, digits = 3),
     format.pval(sa_within$p.value, digits = 3),
     format.pval(nac_within$p.value, digits = 3)
   ),
@@ -794,12 +818,12 @@ effects_comparison <- data.frame(
     ifelse(benign_bias_test$p.value < 0.001, "***",
            ifelse(benign_bias_test$p.value < 0.01, "**",
                   ifelse(benign_bias_test$p.value < 0.05, "*", "ns"))),
-    ifelse(threat_endorse_test$p.value < 0.001, "***",
-           ifelse(threat_endorse_test$p.value < 0.01, "**",
-                  ifelse(threat_endorse_test$p.value < 0.05, "*", "ns"))),
-    ifelse(benign_endorse_test$p.value < 0.001, "***",
-           ifelse(benign_endorse_test$p.value < 0.01, "**",
-                  ifelse(benign_endorse_test$p.value < 0.05, "*", "ns"))),
+    ifelse(threat_endorse_p < 0.001, "***",
+           ifelse(threat_endorse_p < 0.01, "**",
+                  ifelse(threat_endorse_p < 0.05, "*", "ns"))),
+    ifelse(benign_endorse_p < 0.001, "***",
+           ifelse(benign_endorse_p < 0.01, "**",
+                  ifelse(benign_endorse_p < 0.05, "*", "ns"))),
     ifelse(sa_within$p.value < 0.001, "***",
            ifelse(sa_within$p.value < 0.01, "**",
                   ifelse(sa_within$p.value < 0.05, "*", "ns"))),
@@ -808,12 +832,58 @@ effects_comparison <- data.frame(
                   ifelse(nac_within$p.value < 0.05, "*", "ns")))
   ),
   Replicated = c(
-    ifelse(threat_bias_test$p.value < 0.05 & threat_bias_test$statistic > 0, "Yes", "No"),
-    ifelse(benign_bias_test$p.value < 0.05 & benign_bias_test$statistic > 0, "Yes", "No"),
-    ifelse(threat_endorse_test$p.value < 0.05 & threat_endorse_test$statistic > 0, "Yes", "No"),
-    ifelse(benign_endorse_test$p.value < 0.05 & benign_endorse_test$statistic < 0, "Yes", "No"),
-    ifelse(sa_within$p.value >= 0.05, "Yes", "Partial"),  # Original was ns
-    ifelse(nac_within$p.value < 0.05 & nac_within$statistic < 0, "Yes", "No")
+    
+    {
+      sa_threat <- mean(analysis_data$threat_bias_social[analysis_data$group == "SA"], na.rm=TRUE)
+      nac_threat <- mean(analysis_data$threat_bias_social[analysis_data$group == "NAC"], na.rm=TRUE)
+      
+      if(threat_bias_test$p.value < 0.05 && sa_threat > nac_threat && 
+         sa_threat > 0 && nac_threat < 0) {
+        "Yes"
+      } else if(threat_bias_test$p.value < 0.05 && sa_threat > nac_threat) {
+        "Partial"  
+      } else {
+        "No"
+      }
+    },
+    
+   
+    {
+      sa_benign <- mean(analysis_data$benign_bias_social[analysis_data$group == "SA"], na.rm=TRUE)
+      nac_benign <- mean(analysis_data$benign_bias_social[analysis_data$group == "NAC"], na.rm=TRUE)
+      # Check if pattern matches: SA should be positive (lacking benign bias), NAC negative (having it)
+      if(benign_bias_test$p.value < 0.05 && sa_benign > 0 && nac_benign < 0) {
+        "Yes"
+      } else {
+        "No"
+      }
+    },
+    
+
+    {
+      sa_threat_end <- mean(analysis_data$pct_social_threat[analysis_data$group == "SA"], na.rm=TRUE)
+      nac_threat_end <- mean(analysis_data$pct_social_threat[analysis_data$group == "NAC"], na.rm=TRUE)
+      if(threat_endorse_p < 0.05 && sa_threat_end > nac_threat_end) {
+        "Yes"
+      } else {
+        "No"
+      }
+    },
+    
+
+    {
+      sa_benign_end <- mean(analysis_data$pct_social_benign[analysis_data$group == "SA"], na.rm=TRUE)
+      nac_benign_end <- mean(analysis_data$pct_social_benign[analysis_data$group == "NAC"], na.rm=TRUE)
+      if(benign_endorse_p < 0.05 && nac_benign_end > sa_benign_end) {
+        "Yes"
+      } else {
+        "No"
+      }
+    },
+  
+    ifelse(sa_within$p.value >= 0.05, "Yes", "No"),
+  
+    ifelse(nac_within$p.value < 0.05 && nac_within$statistic < 0, "Yes", "No")
   )
 )
 
@@ -823,23 +893,233 @@ kable(effects_comparison,
                     "Replication Test", "p", "Sig", "Replicated?"),
       align = c("l", "c", "c", "c", "c", "c", "c", "c")) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
-  add_footnote(c("* p < .05, ** p < .01, *** p < .001, ns = not significant",
-                 "Note: Pilot B data with n=2 per group - results not interpretable"),
+  add_footnote(c("* p < .05, ** p < .01, *** p < .001, ns = not significant"),
                notation = "none")
+
+write.csv(effects_comparison, 
+          "table2_effects.csv", 
+          row.names = FALSE)
+
+
 ```
 
 ### Exploratory analyses
 
-Any follow-up analyses desired (not required).
+From the confirmatory analyses, we see that there was a much smaller difference in social threat endorsement between the two groups than in the original study. To better understand these results, we look into the effect of this group assignment split. First, we see whether using a continuous scale of SPIN scores and including all participants yields similar results. 
+
+
+```{r}
+library(ggplot2)
+
+# Calculate correlation
+cor_value <- cor.test(participant_data$spin_total, participant_data$pct_social_threat)
+
+ggplot(data = participant_data, aes(x = spin_total, y = pct_social_threat)) + 
+  geom_point(alpha = 0.6, size = 3, color = "steelblue") + 
+  geom_smooth(method = "lm", color = "darkblue", fill = "lightblue", size = 1.2) +
+  labs(
+    title = "Social Anxiety and Social Threat Perception",
+    x = "SPIN Total Score",
+    y = "Percent Social Threat Endorsement (%)",
+    caption = sprintf("r = %.2f, p %s", 
+                      cor_value$estimate, 
+                      ifelse(cor_value$p.value < .001, "< .001", 
+                             paste("=", round(cor_value$p.value, 3))))
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank()
+  )
+
+cor_benign <- cor.test(participant_data$spin_total, participant_data$pct_social_benign)
+
+ggplot(data = participant_data, aes(x = spin_total, y = pct_social_benign)) + 
+  geom_point(alpha = 0.6, size = 3, color = "coral") + 
+  geom_smooth(method = "lm", color = "darkred", fill = "lightcoral", size = 1.2) +
+  labs(
+    title = "Social Anxiety and Social Benign Perception",
+    x = "SPIN Total Score",
+    y = "Percent Endorsement (%)",
+    caption = sprintf("r = %.2f, p %s", 
+                      cor_benign$estimate, 
+                      ifelse(cor_benign$p.value < .001, "< .001", 
+                             paste("=", round(cor_benign$p.value, 3))))
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank()
+  )
+```
+
+We then look at reaction time data to see if the continuous scale reveals any different trends.
+
+```{r}
+cor_value2 <- cor.test(participant_data$spin_total, participant_data$threat_bias_social)
+
+ggplot(data = participant_data, aes(x = spin_total, y = threat_bias_social)) + 
+  geom_point(alpha = 0.6, size = 3, color = "coral") + 
+  geom_smooth(method = "lm", color = "darkred", fill = "lightcoral", size = 1.2) +
+  labs(
+    title = "Social Anxiety and Threat Bias",
+    x = "SPIN Total Score",
+    y = "Social Threat Bias",
+    caption = sprintf("r = %.2f, p %s", 
+                      cor_value2$estimate, 
+                      ifelse(cor_value2$p.value < .001, "< .001", 
+                             paste("=", round(cor_value2$p.value, 3))))
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank()
+  )
+
+cor_value2 <- cor.test(participant_data$spin_total, participant_data$benign_bias_social)
+
+ggplot(data = participant_data, aes(x = spin_total, y = benign_bias_social)) + 
+  geom_point(alpha = 0.6, size = 3, color = "coral") + 
+  geom_smooth(method = "lm", color = "darkred", fill = "lightcoral", size = 1.2) +
+  labs(
+    title = "Social Anxiety and Benign Bias",
+    x = "SPIN Total Score",
+    y = "Social Benign Bias",
+    caption = sprintf("r = %.2f, p %s", 
+                      cor_value2$estimate, 
+                      ifelse(cor_value2$p.value < .001, "< .001", 
+                             paste("=", round(cor_value2$p.value, 3))))
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank()
+  )
+```
+Since there was no significant effect of SPIN scores on threat and benign reaction time biases in the confirmatory analyses, we look to see if there were significant differences in reaction time by age. 
+```{r}
+library(dplyr)
+
+summary_data <- participant_data %>%
+  group_by(age) %>%
+  summarize(
+    mean_rt = mean(rt_social_threat_endorsement, na.rm = TRUE),
+    se_rt = sd(rt_social_threat_endorsement, na.rm = TRUE) / sqrt(n()),
+    n = n()
+  )
+
+ggplot(summary_data, aes(x = age, y = mean_rt)) + 
+  geom_col(fill = "steelblue", alpha = 0.7, width = 0.8) + 
+  geom_errorbar(aes(ymin = mean_rt - se_rt, ymax = mean_rt + se_rt), 
+                width = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred", 
+              linetype = "dashed", size = 1) +
+  geom_text(aes(label = paste0("n=", n)), vjust = -1.5, size = 3.5) +
+  labs(
+    title = "Response Time to Social Threat by Age",
+    x = "Age (years)",
+    y = "Mean Response Time (ms)",
+    caption = "Error bars show ±SE"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)))  # Add space at top for labels
+```
+Lastly, we look at the sample means of social anxiety scores to see if the sample mean was significantly more anxious than community norms.
+```{r}
+
+
+
+community_mean <- 11.3
+
+# Basic one-sample t-test
+t_result <- t.test(participant_data$spin_total, mu = community_mean)
+
+sample_mean <- t_result$estimate          # Mean of x
+ci_lower <- t_result$conf.int[1]          # Lower bound of 95% CI
+ci_upper <- t_result$conf.int[2]          # Upper bound of 95% CI
+sample_n <- t_result$parameter + 1  
+
+
+means_df <- data.frame(
+  group = c("Sample", "Community"),
+  mean = c(sample_mean, community_mean),
+  ci_lower = c(ci_lower, community_mean),
+  ci_upper = c(ci_upper, community_mean)
+)
+
+ggplot() +
+  # Background: individual points (faded)
+  geom_jitter(data=participant_data, 
+              aes(x=1, y=spin_total), 
+              width=0.15, alpha=0.15, color="steelblue", size=2) +
+  
+  # Sample mean with 95% CI
+  geom_errorbar(data=filter(means_df, group=="Sample"), 
+                aes(x=1, y=mean, ymin=ci_lower, ymax=ci_upper), 
+                color="darkblue", width=0.15, size=1.5) +
+  geom_point(data=filter(means_df, group=="Sample"),
+             aes(x=1, y=mean), 
+             color="darkblue", size=6, shape=18) +
+  geom_text(data=filter(means_df, group=="Sample"),
+            aes(x=1, y=mean, label=round(mean, 1)), 
+            hjust=-0.8, size=5, fontface="bold") +
+  
+  # Community mean (no CI)
+  geom_point(data=filter(means_df, group=="Community"),
+             aes(x=1, y=mean), 
+             color="red", size=6, shape=18) +
+  geom_text(data=filter(means_df, group=="Community"),
+            aes(x=1, y=mean, label=round(mean, 1)), 
+            hjust=-0.8, size=5, fontface="bold", color="red") +
+  
+  # Add legend manually
+  annotate("point", x=0.7, y=48, color="darkblue", size=5, shape=18) +
+  annotate("text", x=0.75, y=48, label="Sample Mean (95% CI)", hjust=0, size=4) +
+  annotate("point", x=0.7, y=45, color="red", size=5, shape=18) +
+  annotate("text", x=0.75, y=45, label="Community Mean", hjust=0, size=4) +
+  
+  scale_x_continuous(limits=c(0.6, 1.4), breaks=1, labels="") +
+  labs(title="Sample Anxiety Scores vs. Community Mean",
+       subtitle=paste0("N = ", sample_n),
+       y="SPIN Total Score",
+       x="") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        panel.grid.major.x = element_blank())
+
+
+
+```
+
 
 ## Discussion
 
 ### Summary of Replication Attempt
 
-<!-- Open the discussion section with a paragraph summarizing the primary result from the confirmatory analysis and the assessment of whether it replicated, partially replicated, or failed to replicate the original result. -->
+This experiment resulted in a partial replication of the original study's findings. Consistent with the original findings, this replication found that while there were no significant differences in endorsement rates of the threat and benign associations for the social anxiety (SA) group, the non-anxious control (NAC) endorsed benign associations significantly more than threat associations. However, my attempt failed to replicate the significant within-group differences shown in the original result, namely that in comparison to the NAC group, the SA group was significantly more likely to endorse threat associations, less likely to endorse benign associations, faster to endorse social threat associations, and slower to reject social threat associations. 
 
-To be completed when full data is collected. 
+
 
 ### Commentary
 
-Add open-ended commentary (if any) reflecting (a) insights from follow-up exploratory analysis, (b) assessment of the meaning of the replication (or not) - e.g., for a failure to replicate, are the differences between original and present study ones that definitely, plausibly, or are unlikely to have been moderators of the result, and (c) discussion of any objections or challenges raised by the current and original authors about the replication attempt. None of these need to be long.
+In our exploratory analysis, we aimed to better understand why the between-group differences did not replicate. One surprising result from the confirmatory analysis was the high social threat endorsement rate from the NAC group, which was almost twice as high as in the original experiment. There are two likely reasons for this difference which were both methodological deviations from the original study. First, the original study assigned their groups based on community norms of the Social Phobia Anxiety Inventory such that the NAC was the group that scored lower than the 30th percentile on the SPAI and the SA group scored higher than th 70th percentile. Due to sample size constraints as well as the lack of available community norms for the public inventory used in the replication, groups were assigned based on within-sample percentiles. We see in our exploratory analysis that the sample mean anxiety scores were significantly higher than the community mean reported in a study of adolescents (Ranta et al., 2007). Considering the clinical cutoff for social anxiety in this study was found to be a score of 19 and the sample mean was 24, it seems that this sample was relatively high in social anxiety which explains the lack of significant differences between the bottom 30 percent and top 30 percent of the sample. Additionally, the original study only used university students as a convenience sample for the adult population. My replication including ages ranging from 18 to 75, which I suspected may have influenced the difference in reaction time-based findings. From our exploratory analyses, we see significant reaction time differences across age groups, which may affect the quality of the reaction time bias measurements.
+
+Lastly, we used a continuous SPIN scale instead of the original design's group assignments to see if there was a significant correlation when less underpowered. We see a marginally significant positive correlation between SPIN scores and social threat endorsement, but the other continuous plots show no correlation. This could suggest several potential reasons why the replication failed. We have established that the replication did not achieve the same variance in social anxiety levels across group. The replication may have needed higher power to see any significant correlation between SPIN scores and endorsement rates, since adding in the middle 40% in this continuous sample yielded results that were just short of significant (p = .054). However, it is more likely that there were implementation challenges that reduced the data quality. The original study was in-person while the replication was held on Prolific, making it potentially more vulnerable to key spamming and external distractions. 
+
+
+
+### References
+Beard, C., Amir, N. Interpretation in Social Anxiety: When Meaning Precedes Ambiguity. Cogn Ther Res 33, 406–415 (2009). https://doi.org/10.1007/s10608-009-9235-0
+
+Ranta, K., Kaltiala-Heino, R., Rantanen, P., Tuomisto, M. T., & Marttunen, M. (2007). Screening social phobia in adolescents from general population: The validity of the Social Phobia Inventory (SPIN) against a clinical interview. European Psychiatry, 22(4), 244-251. https://doi.org/10.1016/j.eurpsy.2006.12.002
+
+
